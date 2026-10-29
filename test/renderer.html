@@ -56,6 +56,12 @@ try {
   assert(sample(300, 330)[3] > 200, 'Fabric exists below the neck');
   assert(sample(145, 320)[3] > 200 && sample(455, 320)[3] > 200, 'Both short sleeves cover the upper arms');
   assert(sample(124, 500)[3] === 0, 'Lower arms remain outside the garment');
+  renderer.render({ torso: fitTorso(landmarks, source, { width: 1.2, length: 1, vertical: 0 }) });
+  assert(sample(175, 450)[3] > 200 && closed === 0, 'Torso-only redraw updates fit without replacing or closing the source');
+  renderer.render({ torso: { kind: 'unavailable' } });
+  assert(sample(300, 450)[3] === 0 && base.getContext('2d').getImageData(300, 450, 1, 1).data[0] === 201, 'An invalid edit clears geometry but preserves the frozen source');
+  renderer.render({ torso });
+  assert(sample(300, 450)[3] > 200 && closed === 0, 'Valid geometry can redraw after an invalid draft');
   renderer.setEnabled(false);
   assert(sample(300, 450)[3] === 0, 'Disabling immediately clears the overlay');
   assert(base.getContext('2d').getImageData(300, 450, 1, 1).data[0] === 201, 'Disabling preserves the current source image');

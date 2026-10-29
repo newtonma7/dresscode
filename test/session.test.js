@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSession } from '../src/session.js';
+import { createPreviewSession } from '../src/session.js';
 
 class FakeTrack extends EventTarget {
   kind = 'video';
@@ -36,11 +36,20 @@ function setup() {
   const video = {
     srcObject: null,
     play: async () => {},
-    requestVideoFrameCallback: () => 1,
-    cancelVideoFrameCallback: () => {},
+    requestVideoFrameCallback: (callback) => { video.capture = (...args) => { video.capture = null; return callback(...args); }; return 1; },
+    cancelVideoFrameCallback: () => { video.capture = null; },
   };
   const clears = [];
-  const renderer = { clear: () => clears.push('clear') };
+  const renders = [];
+  let retained;
+  const renderer = {
+    render(input) {
+      if (input.bitmap && input.bitmap !== retained) { retained?.close(); retained = input.bitmap; }
+      renders.push(input);
+    },
+    setSegmentation() {},
+    clear() { retained?.close(); retained = undefined; clears.push('clear'); },
+  };
   const statuses = [];
   const tracking = [];
   const prior = {
@@ -56,9 +65,9 @@ function setup() {
   globalThis.Worker = class extends FakeWorker {
     constructor(...args) { super(...args); FakeWorker.instances.push(this); }
   };
-  const session = createSession({ video, renderer, onStatus: (value) => statuses.push(value), onTracking: (value) => tracking.push(value) });
+  const session = createPreviewSession({ video, renderer, onStatus: (value) => statuses.push(value), onTracking: (value) => tracking.push(value) });
   return {
-    session, track, video, renderer, clears, statuses, tracking,
+    session, track, video, renderer, clears, renders, statuses, tracking,
     worker: (index = 0) => FakeWorker.instances[index],
     restore() {
       if (prior.navigator) Object.defineProperty(globalThis, 'navigator', prior.navigator);
@@ -193,6 +202,25 @@ test('a stopped camera owner cannot fail the replacement session', async () => {
   } finally { app.session.stop(); app.restore(); }
 });
 
+const bodyPoints = () => {
+  const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 0 }));
+  for (const [id, x, y] of [[11, .3, .3], [12, .7, .3], [13, .2, .5], [14, .8, .5], [23, .35, .8], [24, .65, .8]]) points[id] = { x, y, visibility: .9 };
+  return points;
+};
+const fakeBitmap = () => ({ width: 600, height: 800, closed: 0, close() { this.closed++; } });
+async function trackedCamera(app) {
+  globalThis.createImageBitmap = async () => fakeBitmap();
+  await app.session.start();
+  app.worker().send({ type: 'ready' });
+  return replyFrame(app);
+}
+async function replyFrame(app, landmarks = bodyPoints()) {
+  await app.video.capture(0, { mediaTime: 1 });
+  const request = app.worker().lastMessage;
+  app.worker().send({ ...request, type: 'result', landmarks, inferenceMs: 1 });
+  return request;
+}
+
 test('an early worker loader error during pending playback stops startup', async () => {
   const app = setup();
   let resolvePlay;
@@ -234,4 +262,166 @@ test('occlusion revisions discard an in-flight old mask and capture the new inte
     assert.notEqual(worker.lastMessage.revision, first.revision);
     assert.deepEqual(segmentation, [false, true]);
   } finally { app.session.stop(); app.restore(); }
+});
+
+test('frozen calibration uses the displayed observation and closes late replies once', async () => {
+  const app = setup();
+  try {
+    const shown = await trackedCamera(app);
+    await app.video.capture(0, { mediaTime: 2 });
+    const pending = app.worker().lastMessage;
+    assert.equal(app.session.beginCalibration(), true);
+    assert.equal(app.session.state, 'editing');
+    const count = app.renders.length;
+    app.worker().send({ ...pending, type: 'result', landmarks: bodyPoints() });
+    assert.equal(pending.bitmap.closed, 1);
+    assert.equal(shown.bitmap.closed, 0);
+    assert.equal(app.renders.length, count);
+    assert.equal(app.video.capture, null);
+    const raw = app.session.editor.points.find((p) => p.id === 11).point;
+    assert.equal(raw.x, .3);
+    app.session.movePoint(11, { x: .2, y: .35 });
+    const moved = app.session.editor.points.find((p) => p.id === 11).point;
+    assert.ok(Math.abs(moved.x - .2) < 1e-10);
+    assert.equal(app.renders.at(-1).bitmap, undefined);
+    assert.equal(shown.bitmap.closed, 0);
+    app.session.finishCalibration(true);
+    assert.equal(app.session.state, 'running');
+    assert.ok(app.video.capture);
+    await replyFrame(app);
+    assert.ok(Math.abs(app.session.editor.points.find((p) => p.id === 11).point.x - .2) < 1e-10);
+    assert.equal(shown.bitmap.closed, 1);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('collapsing corrected shoulders rejects the draft without losing the frozen bitmap or fit', async () => {
+  const app = setup();
+  try {
+    const shown = await trackedCamera(app);
+    app.session.beginCalibration();
+    const lastFit = app.renders.at(-1).torso;
+    assert.equal(app.session.movePoint(11, { x: .7, y: .3 }), false);
+    assert.match(app.session.editor.editReason, /shoulders apart/);
+    assert.equal(app.renders.at(-1).torso, lastFit);
+    assert.equal(shown.bitmap.closed, 0);
+    app.session.resetCorrections();
+    assert.equal(app.session.editor.editReason, '');
+    app.session.finishCalibration(false);
+    assert.equal(app.renders.at(-1).torso.kind, 'torso');
+    assert.equal(shown.bitmap.closed, 0);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('fit sliders redraw immediately during edits, cancel restores committed points and reset preserves fit', async () => {
+  const app = setup();
+  try {
+    await trackedCamera(app);
+    const initial = app.renders.at(-1).torso;
+    app.session.beginCalibration();
+    app.session.movePoint(13, { x: .1, y: .55 });
+    app.session.setFit({ width: 1.2, length: 1.1, vertical: .1 });
+    const fitted = app.renders.at(-1).torso;
+    assert.ok(Math.abs(fitted.width / initial.width - 1.2) < 1e-10);
+    assert.ok(Math.abs(fitted.height / initial.height - 1.1) < 1e-10);
+    assert.ok(Math.abs(fitted.elbows[0].x - 60) < 1e-10);
+    app.session.finishCalibration(false);
+    assert.equal(app.renders.at(-1).torso.elbows[0].x, 120);
+    assert.equal(app.renders.at(-1).torso.width, fitted.width);
+    app.session.beginCalibration();
+    app.session.movePoint(13, { x: .1, y: .55 });
+    app.session.finishCalibration(true);
+    app.session.beginCalibration();
+    app.session.resetCorrections();
+    assert.equal(app.session.editor.hasCorrections, false);
+    assert.equal(app.renders.at(-1).torso.width, fitted.width);
+    app.session.finishCalibration(false);
+    assert.equal(app.session.editor.hasCorrections, true);
+    app.session.resetCorrections();
+    assert.equal(app.session.editor.hasCorrections, false);
+    assert.equal(app.renders.at(-1).torso.elbows[0].x, 120);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('corrections stay dormant through tracking loss but require raw valid shoulders', async () => {
+  const app = setup();
+  try {
+    await trackedCamera(app);
+    app.session.beginCalibration();
+    app.session.movePoint(11, { x: .2, y: .3 });
+    app.session.finishCalibration(true);
+    const missing = bodyPoints();
+    missing[11] = { x: .3, y: .3, visibility: .1 };
+    await replyFrame(app, missing);
+    assert.equal(app.session.editor.canEdit, false);
+    assert.equal(app.session.beginCalibration(), false);
+    assert.equal(app.session.editor.hasCorrections, true);
+    await replyFrame(app);
+    assert.ok(Math.abs(app.session.editor.points[0].point.x - .2) < 1e-10);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('stop and device replacement invalidate editing, corrections and delayed capture bitmaps', async () => {
+  const app = setup();
+  try {
+    const shown = await trackedCamera(app);
+    app.session.beginCalibration();
+    app.session.movePoint(11, { x: .2, y: .3 });
+    const worker = app.worker();
+    app.session.stop();
+    assert.equal(shown.bitmap.closed, 1);
+    assert.equal(app.session.state, 'stopped');
+    assert.equal(app.session.editor.canEdit, false);
+    assert.equal(app.session.editor.hasCorrections, false);
+    assert.equal(app.session.movePoint(11, { x: .2, y: .3 }), false);
+    const late = fakeBitmap();
+    worker.send({ type: 'result', bitmap: late });
+    assert.equal(late.closed, 1);
+    await app.session.start('replacement');
+    app.worker(1).send({ type: 'ready' });
+    assert.equal(app.session.editor.hasCorrections, false);
+    let resolveBitmap;
+    globalThis.createImageBitmap = () => new Promise((resolve) => { resolveBitmap = resolve; });
+    const capturing = app.video.capture(0, {});
+    app.session.stop();
+    const captured = fakeBitmap();
+    resolveBitmap(captured);
+    await capturing;
+    assert.equal(captured.closed, 1);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('demo and camera share the transaction path without retaining corrections across sources', async () => {
+  const app = setup();
+  try {
+    await app.session.startDemo(async () => ({ bitmap: fakeBitmap(), landmarks: bodyPoints() }));
+    assert.equal(FakeWorker.instances.length, 0);
+    assert.equal(app.session.editor.source, 'demo');
+    app.session.beginCalibration();
+    app.session.movePoint(24, { x: .75, y: .9 });
+    app.session.finishCalibration(true);
+    await Promise.resolve();
+    assert.ok(Math.abs(app.session.editor.points.find((p) => p.id === 24).point.x - .75) < 1e-10);
+    app.session.beginCalibration();
+    app.session.movePoint(24, { x: .8, y: .9 });
+    app.session.finishCalibration(false);
+    assert.ok(Math.abs(app.session.editor.points.find((p) => p.id === 24).point.x - .75) < 1e-10);
+    await app.session.start();
+    assert.equal(app.session.editor.hasCorrections, false);
+    assert.equal(app.session.editor.source, 'camera');
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('a late demo bitmap cannot replace a stopped or replacement source', async () => {
+  const app = setup();
+  let resolveFrame;
+  try {
+    const starting = app.session.startDemo(() => new Promise((resolve) => { resolveFrame = resolve; }));
+    app.session.stop();
+    const bitmap = fakeBitmap();
+    resolveFrame({ bitmap, landmarks: bodyPoints() });
+    await starting;
+    assert.equal(bitmap.closed, 1);
+    assert.equal(app.renders.length, 0);
+    assert.equal(app.session.state, 'stopped');
+  } finally { app.restore(); }
 });

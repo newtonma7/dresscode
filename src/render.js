@@ -147,7 +147,8 @@ export function createRenderer({ base, garment, foreground }) {
       currentMask = input.mask;
       currentTorso = input.torso;
     }
-    if (!currentBitmap || currentTorso?.kind !== 'torso') {
+    if (input.torso) currentTorso = input.torso;
+    if (!currentBitmap || (input.bitmap && currentTorso?.kind !== 'torso')) {
       clear();
       return;
     }
@@ -155,6 +156,7 @@ export function createRenderer({ base, garment, foreground }) {
     if (renderWidth !== width || renderHeight !== height) resize(width, height);
     baseContext.drawImage(currentBitmap, 0, 0, width, height);
     foregroundContext.clearRect(0, 0, width, height);
+    if (currentTorso?.kind !== 'torso') { gl.clear(true, true, true); return; }
     for (const { mesh, columns, rows, point } of panels) {
       mesh.visible = enabled;
       if (!enabled) continue;

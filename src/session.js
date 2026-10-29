@@ -1,133 +1,186 @@
 import { fitTorso } from './geometry.js';
+import { BODY_POINTS, correctedLandmarks, correctionForPoint, shoulderBasis, usablePoint } from './calibration.js';
 
-const blend = (previous, next, amount) => {
-  if (!previous || previous.kind !== 'torso' || next.kind !== 'torso') return next;
-  const point = (a, b) => ({ x: a.x + (b.x - a.x) * amount, y: a.y + (b.y - a.y) * amount });
-  return {
-    ...next,
-    center: point(previous.center, next.center),
-    shoulders: next.shoulders.map((value, i) => point(previous.shoulders[i], value)),
-    elbows: next.elbows.map((value, i) => previous.elbows[i] && value ? point(previous.elbows[i], value) : value),
-    wrists: next.wrists.map((value, i) => previous.wrists[i] && value ? point(previous.wrists[i], value) : value),
-    width: previous.width + (next.width - previous.width) * amount,
-    height: previous.height + (next.height - previous.height) * amount,
-    shoulderSpan: previous.shoulderSpan + (next.shoulderSpan - previous.shoulderSpan) * amount,
+export function createPreviewSession({ video, renderer, onStatus, onTracking, onEditor = () => {} }) {
+  const preview = {
+    source: 'none', phase: 'stopped', observation: null,
+    fit: { width: 1, length: 1, vertical: 0 }, corrections: {}, edit: null,
   };
-};
-
-export function createSession({ video, renderer, onStatus, onTracking }) {
-  let state = 'stopped';
   let generation = 0;
   let resources;
-  let fit = { width: 1, length: 1, vertical: 0 };
-  let smoothed;
+  let demoFrame;
   let occlusion = true;
   let revision = 0;
+  let frameSequence = 0;
+
+  function editorView() {
+    const observation = preview.observation;
+    const points = observation && correctedLandmarks(observation.landmarks, observation.frame, preview.edit?.draft ?? preview.corrections);
+    return {
+      source: preview.source, phase: preview.phase, frame: observation?.frame,
+      canEdit: !!points, reason: points ? '' : 'Wait for a tracked frame with both shoulders visible before adjusting tracking.',
+      hasCorrections: Object.keys(preview.edit?.draft ?? preview.corrections).length > 0,
+      editReason: preview.edit?.reason ?? '',
+      points: BODY_POINTS.map(({ id, name }) => ({ id, name, enabled: !!points && usablePoint(observation.landmarks[id]), point: points?.[id] })),
+    };
+  }
 
   function status(next, detail = '') {
-    state = next;
-    onStatus({ state, detail });
+    preview.phase = next;
+    onStatus({ state: next, detail, source: preview.source });
+    onEditor(editorView());
+  }
+
+  function cancelCapture(owner) {
+    if (!owner?.frameId) return;
+    if (video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(owner.frameId);
+    else cancelAnimationFrame(owner.frameId);
+    owner.frameId = 0;
   }
 
   function release(owner = resources) {
     if (!owner || owner.closed) return;
     const wasCurrent = resources === owner;
     owner.closed = true;
-    if (owner.frameId && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(owner.frameId);
+    cancelCapture(owner);
     owner.videoTrack?.removeEventListener('ended', owner.onTrackEnded);
-    if (owner.stream) for (const track of owner.stream.getTracks()) track.stop();
+    for (const track of owner.stream.getTracks()) track.stop();
     if (video.srcObject === owner.stream) video.srcObject = null;
-    owner.worker?.terminate();
-    if (wasCurrent) {
+    owner.worker.terminate();
+    if (wasCurrent) { renderer.clear(); resources = undefined; }
+  }
+
+  function invalidate() {
+    revision += 1;
+    preview.edit = null;
+    preview.observation = null;
+    preview.corrections = {};
+  }
+
+  function torsoFor(observation) {
+    const points = correctedLandmarks(observation.landmarks, observation.frame, preview.edit?.draft ?? preview.corrections);
+    return points ? fitTorso(points, observation.frame, preview.fit) : { kind: 'unavailable', reason: 'Shoulders not visible' };
+  }
+
+  function report(torso, observation = preview.observation) {
+    onTracking({
+      torso, mode: preview.source, frozen: preview.phase === 'editing',
+      inferenceMs: observation?.inferenceMs ?? null, processingMs: observation?.processingMs,
+      timings: observation?.timings, delegate: observation?.delegate,
+      delegateReason: observation?.delegateReason, hardware: observation?.hardware,
+    });
+    onEditor(editorView());
+  }
+
+  function redraw() {
+    if (!preview.observation) return;
+    const torso = torsoFor(preview.observation);
+    renderer.render({ torso });
+    report(torso);
+  }
+
+  function present(data) {
+    const observation = {
+      id: data.id, landmarks: data.landmarks,
+      frame: { width: data.bitmap.width, height: data.bitmap.height },
+      capturedAt: data.capturedAt, inferenceMs: data.inferenceMs,
+      timings: data.timings, delegate: data.delegate, delegateReason: data.delegateReason, hardware: data.hardware,
+    };
+    const torso = data.landmarks ? torsoFor(observation) : { kind: 'unavailable', reason: 'No person detected' };
+    if (torso.kind === 'torso') {
+      preview.observation = observation;
+      renderer.render({
+        bitmap: data.bitmap, torso,
+        mask: occlusion && data.mask ? {
+          data: data.mask instanceof Uint8Array ? data.mask : new Uint8Array(data.mask),
+          width: data.maskWidth, height: data.maskHeight,
+        } : undefined,
+      });
+    } else {
+      preview.observation = null;
+      data.bitmap.close();
       renderer.clear();
-      resources = undefined;
     }
+    observation.processingMs = performance.now() - data.capturedAt;
+    report(torso, observation);
   }
 
   async function start(deviceId) {
     const id = ++generation;
     if (resources) release(resources);
-    smoothed = undefined;
+    else if (preview.observation) renderer.clear();
+    demoFrame = undefined;
+    invalidate();
+    preview.source = 'camera';
     status('starting', 'Requesting camera');
-    let stream;
+    let stream, owner;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
       });
       if (id !== generation) { stream.getTracks().forEach((track) => track.stop()); return; }
-      const owner = {
+      owner = {
         stream,
         videoTrack: stream.getVideoTracks?.()[0] ?? stream.getTracks().find((track) => track.kind === 'video'),
-        worker: new Worker('/tracking-worker.js'),
-        inFlight: false,
+        worker: new Worker('/tracking-worker.js'), inFlight: false,
       };
       owner.onTrackEnded = () => fail(owner, new Error('Camera disconnected. Reconnect the camera and start again.'));
       resources = owner;
-      owner.videoTrack?.addEventListener('ended', owner.onTrackEnded);
-      if (owner.videoTrack?.readyState === 'ended') { owner.onTrackEnded(); return; }
-      video.srcObject = stream;
       owner.worker.onmessage = ({ data }) => {
         if (owner.closed || resources !== owner) { data.bitmap?.close(); return; }
         if (data.type === 'ready') {
-          status('running', 'Camera ready. Find a front-facing pose.');
           owner.ready = true;
+          status('running', 'Camera ready. Find a front-facing pose.');
           schedule(owner);
           return;
         }
-        if (data.type === 'failure') {
-          fail(owner, new Error(data.message));
-          return;
-        }
         owner.inFlight = false;
-        if (data.revision !== revision) { data.bitmap?.close(); schedule(owner); return; }
-        const torso = data.landmarks ? fitTorso(data.landmarks, data.bitmap, fit) : { kind: 'unavailable', reason: 'No person detected' };
-        const next = torso.kind === 'torso' ? blend(smoothed, torso, 0.38) : torso;
-        smoothed = next.kind === 'torso' ? next : undefined;
-        if (next.kind === 'torso') renderer.render({
-          bitmap: data.bitmap,
-          torso: next,
-          mask: data.mask ? { data: new Uint8Array(data.mask), width: data.maskWidth, height: data.maskHeight } : undefined,
-        });
-        else { data.bitmap.close(); renderer.clear(); }
-        const processingMs = performance.now() - data.capturedAt;
-        onTracking({ torso: next, inferenceMs: data.inferenceMs, processingMs, timings: data.timings, delegate: data.delegate, delegateReason: data.delegateReason, hardware: data.hardware, mode: 'camera' });
+        if (data.revision != null && (data.revision !== revision || preview.phase === 'editing')) {
+          data.bitmap?.close(); schedule(owner); return;
+        }
+        if (data.type === 'failure') { fail(owner, new Error(data.message)); return; }
+        present(data);
         schedule(owner);
       };
       owner.worker.onerror = (event) => fail(owner, new Error(event.message || 'Tracking worker failed. Run npm run assets and try again.'));
+      owner.videoTrack?.addEventListener('ended', owner.onTrackEnded);
+      if (owner.videoTrack?.readyState === 'ended') { owner.onTrackEnded(); return; }
+      video.srcObject = stream;
       await video.play();
       if (id !== generation || owner.closed || resources !== owner) { release(owner); return; }
       owner.worker.postMessage({ type: 'init' });
     } catch (error) {
-      if (stream) stream.getTracks().forEach((track) => track.stop());
+      if (owner) release(owner);
+      else stream?.getTracks().forEach((track) => track.stop());
       if (id !== generation) return;
-      resources && release(resources);
+      invalidate();
       renderer.clear();
       const reason = error?.name === 'NotAllowedError'
         ? 'Camera access was denied. Allow camera access for this site, then try again.'
         : error instanceof Error ? error.message : String(error);
       status('error', reason);
-      onTracking({ torso: { kind: 'unavailable', reason }, inferenceMs: null, mode: 'camera' });
+      report({ kind: 'unavailable', reason });
     }
   }
 
-  async function schedule(owner) {
-    if (owner.closed || owner.inFlight || !owner.ready || state !== 'running') return;
+  function schedule(owner) {
+    if (owner.closed || owner.inFlight || owner.frameId || !owner.ready || preview.phase !== 'running') return;
     const capture = async (_now, metadata) => {
       owner.frameId = 0;
-      if (owner.closed || owner.inFlight) return;
+      if (owner.closed || owner.inFlight || preview.phase !== 'running') return;
       owner.inFlight = true;
       const frameRevision = revision;
       const capturedAt = performance.now();
+      let bitmap;
       try {
-        const bitmap = await createImageBitmap(video);
-        if (owner.closed) { bitmap.close(); return; }
+        bitmap = await createImageBitmap(video);
+        if (owner.closed || frameRevision !== revision || preview.phase !== 'running') {
+          bitmap.close(); owner.inFlight = false; schedule(owner); return;
+        }
         const timestamp = Number.isFinite(metadata?.mediaTime) ? metadata.mediaTime * 1000 : performance.now();
-        owner.worker.postMessage({ type: 'frame', id: timestamp, timestamp, bitmap, capturedAt, revision: frameRevision, occlusion }, [bitmap]);
-      } catch (error) {
-        owner.inFlight = false;
-        fail(owner, error);
-      }
+        owner.worker.postMessage({ type: 'frame', id: ++frameSequence, timestamp, bitmap, capturedAt, revision: frameRevision, occlusion }, [bitmap]);
+      } catch (error) { bitmap?.close(); owner.inFlight = false; fail(owner, error); }
     };
     if (video.requestVideoFrameCallback) owner.frameId = video.requestVideoFrameCallback(capture);
     else owner.frameId = requestAnimationFrame(capture);
@@ -137,29 +190,104 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
     if (owner.closed || resources !== owner) return;
     const reason = error instanceof Error ? error.message : String(error);
     release(owner);
+    invalidate();
     status('error', reason);
-    onTracking({ torso: { kind: 'unavailable', reason }, inferenceMs: null, mode: 'camera' });
+    report({ kind: 'unavailable', reason });
   }
 
   function stop() {
     generation += 1;
     if (resources) release(resources);
     else renderer.clear();
-    smoothed = undefined;
+    demoFrame = undefined;
+    invalidate();
+    preview.source = 'none';
     status('stopped');
-    onTracking({ torso: { kind: 'unavailable', reason: 'Preview stopped' }, inferenceMs: null, mode: 'camera' });
+    report({ kind: 'unavailable', reason: 'Preview stopped' });
+  }
+
+  async function captureDemo() {
+    const id = generation, frameRevision = revision;
+    const capturedAt = performance.now();
+    const makeFrame = demoFrame;
+    try {
+      const data = await makeFrame();
+      if (id !== generation || frameRevision !== revision || preview.phase !== 'running') { data.bitmap.close(); return; }
+      present({ ...data, id: ++frameSequence, capturedAt });
+    } catch (error) {
+      if (id !== generation || frameRevision !== revision || preview.phase !== 'running') return;
+      invalidate();
+      renderer.clear();
+      status('error', `Demo error: ${error.message}`);
+      report({ kind: 'unavailable', reason: error.message });
+    }
+  }
+
+  function resume() {
+    revision += 1;
+    preview.edit = null;
+    status('running');
+    redraw();
+    if (preview.source === 'camera') schedule(resources);
+    else captureDemo();
   }
 
   return {
-    start,
-    stop,
-    get state() { return state; },
-    setFit(next) { fit = next; smoothed = undefined; },
+    start, stop,
+    async startDemo(makeFrame) {
+      stop();
+      preview.source = 'demo';
+      demoFrame = makeFrame;
+      status('running', 'Simulated tracking');
+      await captureDemo();
+    },
+    get state() { return preview.phase; },
+    get editor() { return editorView(); },
+    setFit(next) { preview.fit = next; redraw(); },
     setOcclusion(value) {
       if (occlusion === value) return;
       occlusion = value;
       revision += 1;
       renderer.setSegmentation(value);
+      if (preview.source === 'demo' && preview.phase === 'running') captureDemo();
+    },
+    beginCalibration() {
+      if (preview.phase !== 'running' || !preview.observation || !shoulderBasis(preview.observation.landmarks, preview.observation.frame)) return false;
+      revision += 1;
+      cancelCapture(resources);
+      preview.edit = { draft: { ...preview.corrections } };
+      status('editing');
+      redraw();
+      return true;
+    },
+    movePoint(id, target) {
+      if (!preview.edit || !target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) return false;
+      const point = { x: Math.max(0, Math.min(1, target.x)), y: Math.max(0, Math.min(1, target.y)) };
+      const observation = preview.observation;
+      const correction = correctionForPoint(observation.landmarks, observation.frame, id, point);
+      if (!correction) return false;
+      const candidate = { ...preview.edit.draft, [id]: correction };
+      if (Math.abs(correction.across) + Math.abs(correction.down) < 1e-10) delete candidate[id];
+      const torso = fitTorso(correctedLandmarks(observation.landmarks, observation.frame, candidate), observation.frame, preview.fit);
+      if (torso.kind !== 'torso') {
+        preview.edit.reason = 'Keep the shoulders apart. This move cannot produce a valid fit.';
+        onEditor(editorView());
+        return false;
+      }
+      preview.edit.draft = candidate;
+      preview.edit.reason = '';
+      redraw();
+      return true;
+    },
+    finishCalibration(apply) {
+      if (!preview.edit) return;
+      if (apply) preview.corrections = preview.edit.draft;
+      resume();
+    },
+    resetCorrections() {
+      if (preview.edit) { preview.edit.draft = {}; preview.edit.reason = ''; }
+      else preview.corrections = {};
+      redraw();
     },
   };
 }
