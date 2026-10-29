@@ -67,6 +67,17 @@ test('triangle union covers pixel-edge contact, either winding, thin and degener
   assert.equal(coverage[11 * 16 + 15], 0, 'Off-canvas triangles do not wrap into the mask');
 });
 
+test('fully offscreen triangles cannot wrap negative span ends into the mask', () => {
+  for (const triangles of [
+    [[[-40, 0], [-30, 0], [-35, 4]]],
+    [[[20, 0], [30, 0], [25, 4]]],
+    [[[2, -8], [10, -4], [4, -2]]],
+    [[[2, 20], [10, 24], [4, 22]]],
+  ]) {
+    assert.equal(rasterize(triangles).reduce((sum, value) => sum + value, 0), 0);
+  }
+});
+
 test('all projected tailored sleeve triangles remain excluded under roll, crossed and raised poses', () => {
   for (const options of [{}, { roll: .6 }, { crossed: true }, { raised: true }]) {
     const frame = buildGarmentFrame(torsoFor(options), { ...defaultTailoring(), sleeveLength: 135, sleeveOpening: 130 });

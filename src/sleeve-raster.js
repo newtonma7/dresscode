@@ -35,6 +35,7 @@ export function rasterizeSleeveUnion(sleeves, width, height, frameWidth, frameHe
         if (minX === Infinity) continue;
         const firstColumn = Math.max(0, Math.ceil(minX) - 1);
         const lastColumn = Math.min(width - 1, Math.floor(maxX));
+        if (lastColumn < firstColumn) continue;
         coverage.fill(1, row * width + firstColumn, row * width + lastColumn + 1);
       }
     }
