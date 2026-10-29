@@ -20,7 +20,7 @@ Open the loopback URL printed by Vite. Click **Try the camera-free demo** to che
 
 The Three.js 0.186.1 garment is one connected, rounded mesh with front and back volume, shoulder bridges, open sleeves, a folded crew collar, deterministic knit bump detail, and attached seams. It fits corrected shoulder and hip landmarks. If hips are cropped, garment length falls back to shoulder span. Corrected shoulder-to-elbow directions guide sleeves. Authored depth does not infer body yaw.
 
-**Quick fit** keeps the existing width, length, and vertical adjustments. **Tailoring** expands to eight style controls for shoulder width and slope, chest ease, sleeve length and opening, neckline width and depth, and collar thickness. Percentages scale the authored style. Chest ease and vertical fit use shoulder span, and slope uses degrees. These are not physical body measurements. **Reset fit**, **Reset tailoring**, and Tracking's **Reset corrections** affect only their own settings. The source toolbar stays reachable while scrolling on short screens. Mirror, overlay, and foreground segmentation can be toggled.
+**Quick fit** keeps the existing width, length, and vertical adjustments. **Tailoring** expands to eight style controls for shoulder width and slope, chest ease, sleeve length and opening, neckline width and depth, and collar thickness. Percentages scale the authored style. Chest ease and vertical fit use shoulder span, and slope uses degrees. These are not physical body measurements. **Reset fit**, **Reset tailoring**, and Tracking's **Reset corrections** affect only their own settings. The source toolbar stays reachable while scrolling on short screens. On desktop, the preview remains visible beside the tailoring sliders. Mirror, overlay, and foreground segmentation can be toggled.
 
 Click **Adjust tracking** on a tracked camera or demo frame to freeze the displayed image. The camera stays on while editing. Drag the anatomical shoulder, elbow, or hip handles. You can also Tab to a handle and use arrow keys, or Shift+arrow for ten source pixels. Mirror changes the displayed direction, not anatomical names. Missing, low-confidence, and out-of-frame points cannot be edited. Both raw shoulders must be usable.
 
@@ -41,7 +41,7 @@ npm test
 npm run build
 ```
 
-With the dev server running, open `/test/renderer.html`. Expect `PASS` followed by the renderer check count. Open `/test/calibration.html` for session, editor, and coordinate-mapping browser checks. These browser checks cover actual WebGL output, toggles, bare-torso mask compositing, and bitmap cleanup. They use synthetic pixels, not real camera footage. See [verification results](VERIFICATION.md) for the unattended run and remaining quality gates.
+With the dev server running, open `/test/renderer.html`. Expect `PASS` followed by the renderer check count. Open `/test/calibration.html` for session, editor, and coordinate-mapping browser checks. These browser checks cover actual WebGL output, toggles, bare-torso mask compositing, and bitmap cleanup. They use synthetic pixels, not real camera footage. See [tailoring verification](verification/tailoring.md) for the current garment checks and [initial verification](VERIFICATION.md) for the original preview. Real moving-user quality remains an open gate.
 
 Manual quality checks:
 
