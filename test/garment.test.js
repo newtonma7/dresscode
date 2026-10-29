@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BufferGeometry, BufferAttribute } from 'three';
+import { BufferGeometry, BufferAttribute, Matrix3, Matrix4, OrthographicCamera, Vector3 } from 'three';
 import { fitTorso, buildArmCorridors, pointInArmCorridor } from '../src/geometry.js';
 import { createCage, deformCage, garmentTopology, garmentIndices, buildGarmentFrame, pointInSleeve } from '../src/garment-shape.js';
 import { TAILORING, defaultTailoring, tailoringSnapshot } from '../src/tailoring.js';
@@ -184,6 +184,58 @@ test('garment updates retain GPU buffers and rest UVs, use deterministic knit, a
   assert.equal(released.size, resources.size);
   assert.ok([...released.values()].every((n) => n === 1));
   other.dispose();
+});
+
+test('source-pixel garment projects without reflection in the camera and keeps outward normals and seams', () => {
+  const shirt = createTailoredGarment();
+  const camera = new OrthographicCamera(0, 1000, 0, -1000, 0.1, 2000);
+  camera.position.z = 1000;
+  camera.updateMatrixWorld(true);
+  for (const options of [{}, { roll: .6 }, { raised: true }, { crossed: true }]) {
+    const torso = torsoFor(options);
+    const frame = shirt.update(torso, defaultTailoring());
+    shirt.object.updateMatrixWorld(true);
+    const mesh = shirt.object.children[0];
+    const determinant = mesh.matrixWorld.determinant();
+    const normalMatrix = new Matrix3().getNormalMatrix(new Matrix4().multiplyMatrices(camera.matrixWorldInverse, mesh.matrixWorld));
+    const position = mesh.geometry.attributes.position;
+    const normal = mesh.geometry.attributes.normal;
+    const indices = mesh.geometry.index;
+    frame.positions.forEach((p, i) => {
+      const projected = new Vector3().fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld).project(camera);
+      assert.ok(Math.abs((projected.x + 1) * 500 - p[0]) < 1e-4, 'Source pixel X survives scene projection');
+      assert.ok(Math.abs((1 - projected.y) * 500 - p[1]) < 1e-4, 'Source pixel Y survives scene projection');
+    });
+    let frontTriangles = 0;
+    let backTriangles = 0;
+    for (let i = 0; i < indices.count; i += 3) {
+      const points = [0, 1, 2].map((j) => new Vector3().fromBufferAttribute(position, indices.getX(i + j)));
+      const outward = new Vector3().crossVectors(points[1].clone().sub(points[0]), points[2].clone().sub(points[0])).normalize();
+      if (i === 0) {
+        assert.ok(points.every((p) => p.z > 0) && outward.z > .5, 'The authored front panel keeps its outward local normal');
+        assert.ok([0, 1, 2].every((j) => normal.getZ(indices.getX(j)) > 0), 'Three.js vertex normals point out of the front panel');
+      }
+      if (Math.abs(outward.z) < .9) continue;
+      const [a, b, c] = points.map((p) => p.applyMatrix4(mesh.matrixWorld).project(camera));
+      const signedArea = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      const frontFacing = signedArea * Math.sign(determinant) > 0;
+      const viewNormal = outward.applyMatrix3(normalMatrix).normalize();
+      assert.equal(frontFacing, viewNormal.z > 0, 'Three.js determinant-aware frontFacing agrees with the outward view normal');
+      if (frontFacing) frontTriangles++;
+      else backTriangles++;
+    }
+    assert.ok(frontTriangles > 100 && backTriangles > 100, 'Both front and back panels participate in the projection check');
+    garmentTopology.seams.forEach((seam, seamIndex) => {
+      const output = shirt.object.children[seamIndex + 1].geometry.attributes.position;
+      seam.ids.forEach((id, i) => {
+        const offset = new Vector3().fromBufferAttribute(output, i).sub(new Vector3().fromBufferAttribute(position, id));
+        const outward = new Vector3().fromBufferAttribute(normal, id);
+        assert.ok(Math.abs(offset.length() - torso.shoulderSpan * .0015) < 1e-4, 'Seams retain their source-pixel normal offset');
+        assert.ok(offset.transformDirection(mesh.matrixWorld).dot(outward.applyMatrix3(normalMatrix).normalize()) > .9999, 'World-space seam offsets follow the outward shading normal');
+      });
+    });
+  }
+  shirt.dispose();
 });
 
 test('tailoring boundary rejects unknown, nonfinite and out-of-range values without mutating snapshots', () => {

@@ -26,9 +26,9 @@ export function createRenderer({ base, garment, foreground }) {
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xe3efff, 0x172438, 2.1));
   const key = new THREE.DirectionalLight(0xffffff, 1.5);
-  key.position.set(-0.4, -1, 2);
+  key.position.set(-0.4, 1, 2);
   scene.add(key);
-  const camera = new THREE.OrthographicCamera(0, 1, 0, 1, 0.1, 2000);
+  const camera = new THREE.OrthographicCamera(0, 1, 0, -1, 0.1, 2000);
   camera.position.z = 1000;
   const shirt = createTailoredGarment();
   scene.add(shirt.object);
@@ -55,7 +55,7 @@ export function createRenderer({ base, garment, foreground }) {
     camera.left = 0;
     camera.right = width;
     camera.top = 0;
-    camera.bottom = height;
+    camera.bottom = -height;
     camera.updateProjectionMatrix();
     renderWidth = width;
     renderHeight = height;

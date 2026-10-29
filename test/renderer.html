@@ -5,6 +5,7 @@
 <body>
 <pre id="results">Running renderer regressions</pre>
 <script type="module">
+import * as THREE from 'three';
 import { createRenderer } from '/src/render.js';
 import { fitTorso } from '/src/geometry.js';
 import { defaultTailoring } from '/src/tailoring.js';
@@ -51,12 +52,79 @@ try {
     sampleContext.drawImage(layer, 0, 0, 600, 800);
     return sampleContext.getImageData(x, y, 1, 1).data;
   };
-  renderer.render({ bitmap, torso });
+  let view;
+  const beforeRender = THREE.Object3D.prototype.onBeforeRender;
+  THREE.Object3D.prototype.onBeforeRender = function (gl, scene, camera) {
+    if (this.isMesh) view = { gl, scene, camera, mesh: this };
+    return beforeRender.apply(this, arguments);
+  };
+  try { renderer.render({ bitmap, torso }); }
+  finally { THREE.Object3D.prototype.onBeforeRender = beforeRender; }
   assert(sample(210, 450)[3] > 200 && sample(390, 450)[3] > 200, 'Shirt covers both torso edges below the sleeves');
   assert(sample(300, 260)[3] === 0, 'Neck opening reaches the top boundary');
   assert(sample(300, 330)[3] > 200, 'Fabric exists below the neck');
   assert(sample(145, 320)[3] > 200 && sample(455, 320)[3] > 200, 'Both short sleeves cover the upper arms');
   assert(sample(124, 500)[3] === 0, 'Lower arms remain outside the garment');
+
+  const { gl, scene, camera, mesh } = view;
+  const positions = mesh.geometry.attributes.position;
+  const indices = mesh.geometry.index;
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.modelViewMatrix);
+  const sourcePoint = new THREE.Vector3().fromBufferAttribute(positions, 0);
+  const projected = sourcePoint.clone().applyMatrix4(mesh.matrixWorld).project(camera);
+  assert(Math.abs((projected.x + 1) * 300 - sourcePoint.x) < .001 && Math.abs((1 - projected.y) * 400 - sourcePoint.y) < .001, 'Actual renderer camera preserves source-pixel registration');
+  assert(camera.projectionMatrix.elements[0] > 0 && camera.projectionMatrix.elements[5] > 0, 'Actual renderer camera does not hide a reflection in projection');
+  let frontTriangle;
+  for (let i = 0; i < indices.count && !frontTriangle; i += 3) {
+    const points = [0, 1, 2].map((j) => new THREE.Vector3().fromBufferAttribute(positions, indices.getX(i + j)));
+    const outward = new THREE.Vector3().crossVectors(points[1].clone().sub(points[0]), points[2].clone().sub(points[0])).normalize();
+    if (outward.z > .99) frontTriangle = { points, outward };
+  }
+  const viewNormal = frontTriangle.outward.applyMatrix3(normalMatrix).normalize();
+  const [a, b, c] = frontTriangle.points.map((p) => p.applyMatrix4(mesh.matrixWorld).project(camera));
+  const signedArea = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  assert(viewNormal.z > .99 && signedArea * Math.sign(mesh.matrixWorld.determinant()) > 0, 'Actual Three projection classifies outward front panels as frontFacing');
+
+  const material = mesh.material;
+  const side = material.side;
+  const facing = new THREE.ShaderMaterial({
+    side: THREE.DoubleSide,
+    vertexShader: 'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'void main() { gl_FragColor = gl_FrontFacing ? vec4(0.0, 1.0, 0.0, 1.0) : vec4(1.0, 0.0, 0.0, 1.0); }',
+  });
+  const key = scene.children.find((object) => object.isDirectionalLight);
+  const hemisphere = scene.children.find((object) => object.isHemisphereLight);
+  const keyPosition = key.position.clone();
+  const ambientIntensity = hemisphere.intensity;
+  try {
+    mesh.material = facing;
+    gl.render(scene, camera);
+    const face = sample(300, 450);
+    assert(face[1] > 250 && face[0] < 5, 'WebGL gl_FrontFacing is true on the visible chest');
+    mesh.material = material;
+    material.side = THREE.FrontSide;
+    material.needsUpdate = true;
+    gl.render(scene, camera);
+    assert(sample(300, 450)[3] > 200, 'WebGL renders the outward chest with back-face culling enabled');
+    material.side = side;
+    material.needsUpdate = true;
+    hemisphere.intensity = 0;
+    key.position.set(0, 0, 2);
+    gl.render(scene, camera);
+    const lit = sample(300, 450);
+    key.position.set(0, 0, -2);
+    gl.render(scene, camera);
+    const unlit = sample(300, 450);
+    assert(lit[3] > 200 && unlit[3] > 200 && lit[2] > unlit[2] + 30, `Navy fabric receives front light rather than inward back light, blue ${lit[2]} versus ${unlit[2]}`);
+  } finally {
+    mesh.material = material;
+    material.side = side;
+    material.needsUpdate = true;
+    key.position.copy(keyPosition);
+    hemisphere.intensity = ambientIntensity;
+    facing.dispose();
+    gl.render(scene, camera);
+  }
   renderer.render({ torso: fitTorso(landmarks, source, { width: 1.2, length: 1, vertical: 0 }) });
   assert(sample(175, 450)[3] > 200 && closed === 0, 'Torso-only redraw updates fit without replacing or closing the source');
   renderer.render({ torso: { kind: 'unavailable' } });

@@ -51,6 +51,8 @@ export function createTailoredGarment() {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.frustumCulled = false;
   const group = new THREE.Group();
+  // Keep Y-down source pixels local so Three.js can account for reflection in frontFacing.
+  group.scale.y = -1;
   group.add(mesh);
   const seamMaterial = new THREE.LineBasicMaterial({ color: '#71869a', transparent: true, opacity: 0.3 });
   const seams = topology.seams.map((seam) => {
