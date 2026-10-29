@@ -39,9 +39,9 @@ function buildDemo() {
 const demoLandmarks = () => {
   const points = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 1 }));
   const set = (index, x, y) => { points[index] = { x, y, visibility: 0.98 }; };
-  set(0, .5, .17); set(11, .32, .32); set(12, .68, .32);
-  set(13, .24, .49); set(14, .76, .49); set(15, .21, .70); set(16, .79, .70);
-  set(23, .35, .78); set(24, .65, .78);
+  set(0, .5, .17); set(11, .68, .32); set(12, .32, .32);
+  set(13, .76, .49); set(14, .24, .49); set(15, .79, .70); set(16, .21, .70);
+  set(23, .65, .78); set(24, .35, .78);
   return points;
 };
 
