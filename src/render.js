@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildArmCorridors, pointInArmCorridor } from './geometry.js';
 import { createTailoredGarment } from './garment.js';
 import { defaultTailoring } from './tailoring.js';
+import { rasterizeSleeveUnion } from './sleeve-raster.js';
 
 function canvasContext(canvas, options) {
   const context = canvas.getContext('2d', options);
@@ -97,26 +98,14 @@ export function createRenderer({ base, garment, foreground }) {
     const scaleX = width / maskWidth;
     const scaleY = height / maskHeight;
     const corridors = buildArmCorridors(currentTorso, garmentFrame.sleeves);
-    occlusionContext.fillStyle = '#000';
-    occlusionContext.beginPath();
-    for (const { triangles } of garmentFrame.sleeves) {
-      for (const triangle of triangles) {
-        let [a, b, c] = triangle;
-        if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b];
-        occlusionContext.moveTo(a[0] / scaleX, a[1] / scaleY);
-        occlusionContext.lineTo(b[0] / scaleX, b[1] / scaleY);
-        occlusionContext.lineTo(c[0] / scaleX, c[1] / scaleY);
-        occlusionContext.closePath();
-      }
-    }
-    occlusionContext.fill('nonzero');
+    const sleeveCoverage = rasterizeSleeveUnion(garmentFrame.sleeves, maskWidth, maskHeight, width, height);
     const rgba = occlusionContext.getImageData(0, 0, maskWidth, maskHeight);
     for (let y = 0; y < maskHeight; y++) {
       const frameY = (y + 0.5) * scaleY;
       for (let x = 0; x < maskWidth; x++) {
         const frameX = (x + 0.5) * scaleX;
         const i = (y * maskWidth + x) * 4;
-        const sleeveCovered = rgba.data[i + 3] > 0;
+        const sleeveCovered = sleeveCoverage[y * maskWidth + x] !== 0;
         rgba.data[i + 3] = 0;
         const category = currentMask.data[y * maskWidth + x];
         const head = currentTorso.head && (frameX - currentTorso.head.x) ** 2 + (frameY - currentTorso.head.y) ** 2 < (currentTorso.shoulderSpan * 0.6) ** 2;
