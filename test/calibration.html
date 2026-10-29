@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Calibration browser regressions</title>
+<link rel="stylesheet" href="/src/style.css">
+<body>
+<pre id="results">Running calibration regressions</pre>
+<div class="stage" id="stage" style="width:800px;height:400px;min-height:0">
+  <canvas id="base"></canvas><canvas id="garment"></canvas><canvas id="foreground"></canvas>
+  <div class="tracking-editor" id="editor" hidden></div>
+</div>
+<div id="panel" class="calibration-controls">
+  <div class="calibration-buttons">
+    <button data-action="adjust">Adjust tracking</button><button data-action="apply" hidden>Apply and resume</button>
+    <button data-action="cancel" hidden>Cancel</button><button data-action="reset">Reset corrections</button>
+  </div>
+  <p data-hint></p>
+</div>
+<script type="module">
+import { createRenderer } from '/src/render.js';
+import { createPreviewSession } from '/src/session.js';
+import { createDemoFrame } from '/src/demo.js';
+import { createTrackingEditor } from '/src/tracking-editor.js';
+const $ = (id) => document.getElementById(id);
+const results = $('results'), stage = $('stage'), panel = $('panel');
+const action = (name) => panel.querySelector(`[data-action="${name}"]`);
+const checks = [];
+const assert = (value, message) => { if (!value) throw new Error(message); checks.push(message); };
+const near = (a, b) => Math.abs(a - b) < 1e-8;
+let renderer, editor, session, mirrored = true;
+try {
+  renderer = createRenderer({ base: $('base'), garment: $('garment'), foreground: $('foreground') });
+  session = createPreviewSession({ video: {}, renderer, onStatus() {}, onTracking() {}, onEditor: (view) => editor?.update(view) });
+  editor = createTrackingEditor({ session, stage, overlay: $('editor'), panel, mirror: () => mirrored });
+  editor.update(session.editor);
+  assert(action('adjust').disabled && panel.textContent.includes('both shoulders'), 'No tracked frame gives a useful disabled-entry reason');
+  await session.startDemo(createDemoFrame);
+  assert(!action('adjust').disabled && session.editor.source === 'demo', 'The demo enters the shared tracked session');
+  const sourcePoints = session.editor.points;
+  assert([[11, 12], [13, 14], [23, 24]].every(([left, right]) => sourcePoints.find(({ id }) => id === left).point.x > sourcePoints.find(({ id }) => id === right).point.x), 'Front-facing demo source places anatomical left shoulders, elbows, and hips right of anatomical right');
+  action('adjust').click();
+  assert(session.state === 'editing' && document.activeElement.dataset.point === '11', 'Adjust freezes and focuses the first anatomical handle');
+  const handle = document.querySelector('[data-point="11"]');
+  const baseBefore = $('base').toDataURL();
+  const garmentBefore = $('garment').toDataURL();
+  const originalX = session.editor.points[0].point.x;
+  assert(!session.movePoint(11, session.editor.points[1].point) && $('base').toDataURL() === baseBefore && panel.textContent.includes('shoulders apart'), 'Collapsed draft shoulders are rejected with a reason and the frozen image retained');
+  action('reset').click();
+  handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert(near(session.editor.points[0].point.x, originalX - 1 / 600), 'Mirrored right-arrow nudge moves right on screen by one source pixel');
+  handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true, bubbles: true }));
+  assert(near(session.editor.points[0].point.y, .32 + 10 / 800), 'Shift-arrow nudges ten source pixels');
+  session.setFit({ width: 1.2, length: 1.1, vertical: .1 });
+  assert($('garment').toDataURL() !== garmentBefore && $('base').toDataURL() === baseBefore, 'Fit and corrections redraw immediately over the unchanged frozen source');
+  action('cancel').click();
+  assert(session.state === 'running' && near(session.editor.points[0].point.x, originalX), 'Cancel restores committed body points');
+  await Promise.resolve();
+  action('adjust').click();
+  session.movePoint(11, { x: .25, y: .35 });
+  action('apply').click();
+  await Promise.resolve();
+  assert(session.state === 'running' && near(session.editor.points[0].point.x, .25), 'Apply resumes with committed body-relative corrections');
+  action('adjust').click();
+  session.movePoint(11, { x: .2, y: .4 });
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert(session.state === 'running' && near(session.editor.points[0].point.x, .25), 'Escape cancels the edit without losing committed corrections');
+  await Promise.resolve();
+  action('adjust').click();
+  const beforeMirror = parseFloat(handle.style.left), pointBefore = session.editor.points[0].point;
+  mirrored = false; editor.layout();
+  assert(near(parseFloat(handle.style.left) + beforeMirror, stage.clientWidth), 'Mirror recomputes contained handle placement');
+  stage.style.width = '400px'; stage.style.height = '600px'; editor.layout();
+  assert(near(session.editor.points[0].point.x, pointBefore.x) && near(session.editor.points[0].point.y, pointBefore.y), 'Resize and mirror leave stored body-relative offsets unchanged');
+  action('reset').click();
+  assert(!session.editor.hasCorrections && near(session.editor.points[0].point.x, originalX), 'Reset clears the draft points');
+  action('cancel').click();
+  assert(session.editor.hasCorrections, 'Cancel after reset preserves committed corrections');
+  await Promise.resolve();
+  action('reset').click();
+  assert(!session.editor.hasCorrections, 'Reset outside editing clears applied corrections');
+  action('adjust').click();
+  session.stop();
+  assert($('editor').hidden && !session.editor.hasCorrections && action('adjust').disabled, 'Stop invalidates the frozen edit and clears corrections');
+  await session.startDemo(async () => {
+    const frame = await createDemoFrame();
+    frame.landmarks[13].visibility = .1;
+    frame.landmarks[24].x = 1.2;
+    return frame;
+  });
+  action('adjust').click();
+  assert(document.querySelector('[data-point="13"]').disabled && document.querySelector('[data-point="24"]').disabled && panel.textContent.includes('left elbow'), 'Low-confidence and out-of-frame handles are disabled with anatomical reasons');
+  results.textContent = `PASS ${checks.length} calibration checks\n${checks.join('\n')}`;
+  document.documentElement.dataset.result = 'pass';
+} catch (error) {
+  results.textContent = `FAIL after ${checks.length} checks\n${error.stack}`;
+  document.documentElement.dataset.result = 'fail';
+} finally { editor?.dispose(); session?.stop(); renderer?.dispose(); }
+</script>
+</body>
+</html>

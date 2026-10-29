@@ -147,7 +147,8 @@ export function createRenderer({ base, garment, foreground }) {
       currentMask = input.mask;
       currentTorso = input.torso;
     }
-    if (!currentBitmap || currentTorso?.kind !== 'torso') {
+    if (input.torso) currentTorso = input.torso;
+    if (!currentBitmap || (input.bitmap && currentTorso?.kind !== 'torso')) {
       clear();
       return;
     }
@@ -155,6 +156,7 @@ export function createRenderer({ base, garment, foreground }) {
     if (renderWidth !== width || renderHeight !== height) resize(width, height);
     baseContext.drawImage(currentBitmap, 0, 0, width, height);
     foregroundContext.clearRect(0, 0, width, height);
+    if (currentTorso?.kind !== 'torso') { gl.clear(true, true, true); return; }
     for (const { mesh, columns, rows, point } of panels) {
       mesh.visible = enabled;
       if (!enabled) continue;
@@ -177,8 +179,6 @@ export function createRenderer({ base, garment, foreground }) {
     const maskHeight = currentMask.height;
     occlusionCanvas.width = maskWidth;
     occlusionCanvas.height = maskHeight;
-    occlusionContext.drawImage(currentBitmap, 0, 0, maskWidth, maskHeight);
-    const image = occlusionContext.getImageData(0, 0, maskWidth, maskHeight);
     const rgba = occlusionContext.createImageData(maskWidth, maskHeight);
     const scaleX = width / maskWidth;
     const scaleY = height / maskHeight;
@@ -191,15 +191,15 @@ export function createRenderer({ base, garment, foreground }) {
         if (((category === 1 || category === 3) && head)
           || (category === 2 && pointInArmCorridor(frameX, frameY, currentTorso))) {
           const i = (y * maskWidth + x) * 4;
-          rgba.data[i] = image.data[i];
-          rgba.data[i + 1] = image.data[i + 1];
-          rgba.data[i + 2] = image.data[i + 2];
           rgba.data[i + 3] = 255;
         }
       }
     }
     occlusionContext.putImageData(rgba, 0, 0);
     foregroundContext.drawImage(occlusionCanvas, 0, 0, width, height);
+    foregroundContext.globalCompositeOperation = 'source-in';
+    foregroundContext.drawImage(currentBitmap, 0, 0, width, height);
+    foregroundContext.globalCompositeOperation = 'source-over';
   }
 
   function clear() {
@@ -216,7 +216,11 @@ export function createRenderer({ base, garment, foreground }) {
     render,
     clear,
     setEnabled(value) { enabled = value; render(); },
-    setSegmentation(value) { segmentationEnabled = value; render(); },
+    setSegmentation(value) {
+      segmentationEnabled = value;
+      if (!value) currentMask = undefined;
+      render();
+    },
     dispose() {
       if (disposed) return;
       clear();

@@ -2,6 +2,8 @@
 
 This file records observed checks, not a product-quality certification.
 
+The later latency and draggable-point work is recorded in [latency and calibration verification](verification/latency-calibration.md). Its camera-path comparison uses five alternating release-build runs per side on the actual Radeon GPU. The earlier results below remain historical evidence for the first preview.
+
 ## Exit condition
 
 A local page starts without requesting a camera. It renders the navy garment through a camera-free demo. An explicitly started fake camera initializes the actual local models. Stopping releases capture and clears the preview. Restart works. Build and behavioral tests pass. An independent reviewer inspects the implementation. The local server remains available for the user.

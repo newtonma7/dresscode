@@ -1,0 +1,557 @@
+{
+  "baseline": "0ac37ee",
+  "final": "0201fe8",
+  "input": "public pose photo fake camera,960x640,15fps",
+  "records": [
+    {
+      "run": 1,
+      "side": "baseline",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400
+      ],
+      "occlusion": true,
+      "processingLabel": "539 ms inference",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 549.7000000029802,
+          "median": 523.6000000089407,
+          "min": 517.1000000089407
+        },
+        "maskReadbackMs": {
+          "max": 0,
+          "median": 0,
+          "min": 0
+        },
+        "nextPaintMs": {
+          "max": 623.1000000089407,
+          "median": 593.5,
+          "min": 584.0999999940395
+        },
+        "poseMs": {
+          "max": 54.099999994039536,
+          "median": 50.05000000447035,
+          "min": 45.80000001192093
+        },
+        "roundTripMs": {
+          "max": 550.2000000029802,
+          "median": 523.8999999985099,
+          "min": 517.5
+        },
+        "segmentationMs": {
+          "max": 495.8999999910593,
+          "median": 476.3500000014901,
+          "min": 470
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "",
+      "url": "http://127.0.0.1:4175/",
+      "valid": true
+    },
+    {
+      "run": 1,
+      "side": "final",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776
+      ],
+      "occlusion": true,
+      "processingLabel": "58 ms processing · GPU",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 50.5,
+          "median": 49.44999999552965,
+          "min": 46
+        },
+        "maskReadbackMs": {
+          "max": 33.1000000089407,
+          "median": 32.399999998509884,
+          "min": 30.099999994039536
+        },
+        "nextPaintMs": {
+          "max": 60.6000000089407,
+          "median": 57.54999999701977,
+          "min": 56
+        },
+        "poseMs": {
+          "max": 15.400000005960464,
+          "median": 13.74999999254942,
+          "min": 11.5
+        },
+        "roundTripMs": {
+          "max": 51.20000000298023,
+          "median": 49.85000000149011,
+          "min": 46.6000000089407
+        },
+        "segmentationMs": {
+          "max": 3.900000005960465,
+          "median": 2.600000001490116,
+          "min": 2.1000000089406967
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "Pose 14.4 ms; segmentation submit 1.9 ms; mask readback 32.7 ms; worker total 49.1 ms. Hardware WebGL. ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "url": "http://127.0.0.1:4176/",
+      "valid": true
+    },
+    {
+      "run": 2,
+      "side": "baseline",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400
+      ],
+      "occlusion": true,
+      "processingLabel": "514 ms inference",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 540.7999999970198,
+          "median": 522.3500000014901,
+          "min": 512.7999999970198
+        },
+        "maskReadbackMs": {
+          "max": 0,
+          "median": 0,
+          "min": 0
+        },
+        "nextPaintMs": {
+          "max": 614.2000000029802,
+          "median": 589.1499999985099,
+          "min": 581.5
+        },
+        "poseMs": {
+          "max": 55.5,
+          "median": 46.14999999850989,
+          "min": 44.29999999701977
+        },
+        "roundTripMs": {
+          "max": 541.7000000029802,
+          "median": 522.8500000014901,
+          "min": 513.2999999970198
+        },
+        "segmentationMs": {
+          "max": 488.20000000298023,
+          "median": 474.8500000014901,
+          "min": 467.70000000298023
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "",
+      "url": "http://127.0.0.1:4175/",
+      "valid": true
+    },
+    {
+      "run": 2,
+      "side": "final",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776
+      ],
+      "occlusion": true,
+      "processingLabel": "59 ms processing · GPU",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 74.5,
+          "median": 50.94999999552965,
+          "min": 47.29999999701977
+        },
+        "maskReadbackMs": {
+          "max": 34.099999994039536,
+          "median": 33.45000000298023,
+          "min": 30.599999994039536
+        },
+        "nextPaintMs": {
+          "max": 82.69999998807907,
+          "median": 61.75,
+          "min": 56.6000000089407
+        },
+        "poseMs": {
+          "max": 36.80000001192093,
+          "median": 14.399999998509884,
+          "min": 11.599999994039536
+        },
+        "roundTripMs": {
+          "max": 74.79999999701977,
+          "median": 51.5,
+          "min": 47.6000000089407
+        },
+        "segmentationMs": {
+          "max": 3.1000000089406967,
+          "median": 2.6500000059604645,
+          "min": 2.299999997019768
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "Pose 15.6 ms; segmentation submit 2.5 ms; mask readback 33.3 ms; worker total 51.7 ms. Hardware WebGL. ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "url": "http://127.0.0.1:4176/",
+      "valid": true
+    },
+    {
+      "run": 3,
+      "side": "baseline",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400
+      ],
+      "occlusion": true,
+      "processingLabel": "508 ms inference",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 532.4000000059605,
+          "median": 518.25,
+          "min": 508.29999999701977
+        },
+        "maskReadbackMs": {
+          "max": 0.10000000894069672,
+          "median": 0,
+          "min": 0
+        },
+        "nextPaintMs": {
+          "max": 602,
+          "median": 586.3500000014901,
+          "min": 575.6999999880791
+        },
+        "poseMs": {
+          "max": 48.29999999701977,
+          "median": 45.20000000298023,
+          "min": 44.19999998807907
+        },
+        "roundTripMs": {
+          "max": 532.7999999970198,
+          "median": 518.6499999985099,
+          "min": 509
+        },
+        "segmentationMs": {
+          "max": 487.300000011921,
+          "median": 471.6499999985099,
+          "min": 463.40000000596046
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "",
+      "url": "http://127.0.0.1:4175/",
+      "valid": true
+    },
+    {
+      "run": 3,
+      "side": "final",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776
+      ],
+      "occlusion": true,
+      "processingLabel": "54 ms processing · GPU",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 51.70000000298023,
+          "median": 48.650000005960464,
+          "min": 44.70000000298023
+        },
+        "maskReadbackMs": {
+          "max": 34.20000000298023,
+          "median": 32.30000000447035,
+          "min": 29.099999994039536
+        },
+        "nextPaintMs": {
+          "max": 66.90000000596046,
+          "median": 57.79999998956919,
+          "min": 51.79999999701977
+        },
+        "poseMs": {
+          "max": 14.799999997019768,
+          "median": 13.450000010430813,
+          "min": 12.099999994039536
+        },
+        "roundTripMs": {
+          "max": 52.20000000298023,
+          "median": 49.14999999850989,
+          "min": 45.20000000298023
+        },
+        "segmentationMs": {
+          "max": 3.200000002980232,
+          "median": 2.5999999940395355,
+          "min": 2.3999999910593033
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "Pose 13.0 ms; segmentation submit 1.9 ms; mask readback 32.2 ms; worker total 47.5 ms. Hardware WebGL. ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "url": "http://127.0.0.1:4176/",
+      "valid": true
+    },
+    {
+      "run": 4,
+      "side": "baseline",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400
+      ],
+      "occlusion": true,
+      "processingLabel": "519 ms inference",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 552.5999999940395,
+          "median": 526.9499999955297,
+          "min": 519.3999999910593
+        },
+        "maskReadbackMs": {
+          "max": 0,
+          "median": 0,
+          "min": 0
+        },
+        "nextPaintMs": {
+          "max": 620.7999999970198,
+          "median": 593.25,
+          "min": 585.1000000089407
+        },
+        "poseMs": {
+          "max": 61.5,
+          "median": 46.39999999850989,
+          "min": 44.29999999701977
+        },
+        "roundTripMs": {
+          "max": 553,
+          "median": 527.4500000029802,
+          "min": 519.7999999970198
+        },
+        "segmentationMs": {
+          "max": 505.70000000298023,
+          "median": 479.6499999985099,
+          "min": 470.1000000089407
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "",
+      "url": "http://127.0.0.1:4175/",
+      "valid": true
+    },
+    {
+      "run": 4,
+      "side": "final",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776
+      ],
+      "occlusion": true,
+      "processingLabel": "55 ms processing · GPU",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 57.1000000089407,
+          "median": 50.95000000298023,
+          "min": 46.5
+        },
+        "maskReadbackMs": {
+          "max": 36.599999994039536,
+          "median": 32.099999994039536,
+          "min": 29.5
+        },
+        "nextPaintMs": {
+          "max": 66.29999999701977,
+          "median": 60.35000000149011,
+          "min": 54.19999998807907
+        },
+        "poseMs": {
+          "max": 18.599999994039536,
+          "median": 15.600000001490116,
+          "min": 13.900000005960464
+        },
+        "roundTripMs": {
+          "max": 57.599999994039536,
+          "median": 51.45000000298023,
+          "min": 46.79999999701977
+        },
+        "segmentationMs": {
+          "max": 3.200000002980232,
+          "median": 2.5,
+          "min": 2.299999997019768
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "Pose 12.1 ms; segmentation submit 2.1 ms; mask readback 33.0 ms; worker total 47.4 ms. Hardware WebGL. ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "url": "http://127.0.0.1:4176/",
+      "valid": true
+    },
+    {
+      "run": 5,
+      "side": "baseline",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400,
+        614400
+      ],
+      "occlusion": true,
+      "processingLabel": "522 ms inference",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 543.9000000059605,
+          "median": 526.5499999970198,
+          "min": 518.4000000059605
+        },
+        "maskReadbackMs": {
+          "max": 0,
+          "median": 0,
+          "min": 0
+        },
+        "nextPaintMs": {
+          "max": 623.4000000059605,
+          "median": 592.3499999940395,
+          "min": 583.4000000059605
+        },
+        "poseMs": {
+          "max": 60.900000005960464,
+          "median": 48.79999999701977,
+          "min": 45.5
+        },
+        "roundTripMs": {
+          "max": 544.5,
+          "median": 527.1499999985099,
+          "min": 518.8000000119209
+        },
+        "segmentationMs": {
+          "max": 489.79999999701977,
+          "median": 476.4999999925494,
+          "min": 465.70000000298023
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "",
+      "url": "http://127.0.0.1:4175/",
+      "valid": true
+    },
+    {
+      "run": 5,
+      "side": "final",
+      "count": 8,
+      "failures": [],
+      "maskBytes": [
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776,
+        43776
+      ],
+      "occlusion": true,
+      "processingLabel": "79 ms processing · GPU",
+      "renderer": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "stats": {
+        "inferenceMs": {
+          "max": 52.6000000089407,
+          "median": 48.45000000298023,
+          "min": 47.79999999701977
+        },
+        "maskReadbackMs": {
+          "max": 33.1000000089407,
+          "median": 31.899999998509884,
+          "min": 30.700000002980232
+        },
+        "nextPaintMs": {
+          "max": 60.69999998807907,
+          "median": 57.20000000298023,
+          "min": 55.19999998807907
+        },
+        "poseMs": {
+          "max": 18,
+          "median": 13.900000005960464,
+          "min": 12.200000002980232
+        },
+        "roundTripMs": {
+          "max": 53.099999994039536,
+          "median": 48.89999999850989,
+          "min": 48.29999999701977
+        },
+        "segmentationMs": {
+          "max": 2.9000000059604645,
+          "median": 2.450000002980232,
+          "min": 2.200000002980232
+        }
+      },
+      "status": "Torso tracked",
+      "timingStages": "Pose 30.3 ms; segmentation submit 2.0 ms; mask readback 34.5 ms; worker total 67.1 ms. Hardware WebGL. ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)",
+      "url": "http://127.0.0.1:4176/",
+      "valid": true
+    }
+  ]
+}
