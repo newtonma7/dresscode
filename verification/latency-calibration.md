@@ -9,7 +9,7 @@ This measures processing after capture, not physical webcam-to-monitor latency. 
 ## Builds and environment
 
 - Original camera path is commit `0ac37ee`. The design-only baseline `c396114` has identical application code.
-- Updated camera path is commit `0201fe8`.
+- Updated measured camera path is commit `0201fe8`. Later changes correct only the demo's point-side constants and preserve an already reported startup error when playback subsequently rejects. The steady-state worker, render, and calibration processing paths are unchanged.
 - Both builds use Vite production output served from immutable local directories. No Vite client or hot reload is present in accepted runs.
 - Hardware is AMD Ryzen 7 7730U, 16 logical CPUs, Ubuntu Wayland, with ANGLE reporting `AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2`.
 - The browser is isolated headless Chrome with no real profile. It uses fake media, not the physical camera. Launch arguments enable the real GPU through `--enable-gpu --use-angle=gl --use-gl=angle` and use `--no-sandbox` because this Ubuntu environment blocks the automation sandbox. These settings are for local testing, not installation instructions for the user's browser.
@@ -54,6 +54,7 @@ The parent ran the real UI and actual model pipeline rather than relying only on
 - With the fake camera, the video clock advanced while the frozen base-image hash stayed unchanged. A keyboard correction kept the source image frozen. Apply resumed fresh source images and retained the correction.
 - Stop during camera editing ended the track, cleared the video source, hid the editor, and discarded corrections.
 - With occlusion disabled, actual GPU model output still tracks the torso and reports zero segmentation and mask-readback work.
+- A final real-worker fault-injection comparison first reports the useful loader error, then rejects pending playback. The prior build overwrites the loader cause with an AbortError. The closed-owner guard preserves the loader cause, clears the stream, and prevents duplicate cleanup. The regression strengthens the existing startup test, so the total remains 35. Local evidence is `.audit/startup-error-sequence-comparison.json`. An earlier microtask-based injection rejected playback before the error handler and is not evidence for this ordering-sensitive regression.
 
 Local screenshots are `.audit/calibration-demo-edit.png` and `.audit/calibration-camera-frozen.png`. Their native artifact verification reported saved files with no missing, pending, or unverified entries. Code review at `0201fe8` found no blocking lifecycle, correction-math, coordinate, or privacy defect. A focused follow-up at `2ee9014` corrects the demo's anatomical left/right labels without changing the camera processing path. The browser regression increases from 17 to 18 checks and passes after that fix. The published [demo screenshot](calibration-demo.png) contains only the authored synthetic person, not camera footage.
 
