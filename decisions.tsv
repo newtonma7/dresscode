@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-29T05:39:00Z	frame	Limit this run to a local preview	Realism must be tested before meeting integration	DESIGN.md	open
+2026-10-29T05:39:00Z	design	Choose browser-local over native Python	Camera permission and graphics setup need fewer platform adapters	/tmp/dresscode-design-browser.md; /tmp/dresscode-design-native.md	Sketches inspected; native runner ended without final response
+2026-10-29T05:39:00Z	assets	Download models and WASM during setup only	Webcam frames must remain local	 scripts/setup-assets.mjs	Install and asset setup passed

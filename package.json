@@ -1,0 +1,20 @@
+{
+  "name": "dresscode",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "assets": "node scripts/setup-assets.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.5"
+  }
+}
