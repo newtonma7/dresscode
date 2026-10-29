@@ -221,18 +221,23 @@ async function replyFrame(app, landmarks = bodyPoints()) {
   return request;
 }
 
-test('an early worker loader error during pending playback stops startup', async () => {
+test('worker loader error takes priority over playback rejection during startup', async () => {
   const app = setup();
-  let resolvePlay;
+  let rejectPlay;
   try {
-    app.video.play = () => new Promise((resolve) => { resolvePlay = resolve; });
+    app.video.play = () => new Promise((_resolve, reject) => { rejectPlay = reject; });
     const starting = app.session.start();
     await Promise.resolve();
-    app.worker().onerror({ message: 'Early loader failure' });
-    resolvePlay();
+    app.worker().onerror({ message: 'Tracking worker loader failed.' });
+    rejectPlay(new DOMException('The play request was interrupted.', 'AbortError'));
     await starting;
+
     assert.equal(app.session.state, 'error');
+    assert.equal(app.statuses.at(-1).detail, 'Tracking worker loader failed.');
+    assert.equal(app.tracking.at(-1).torso.reason, 'Tracking worker loader failed.');
+    assert.equal(app.video.srcObject, null);
     assert.equal(app.track.stopped, 1);
+    assert.equal(app.worker().terminated, 1);
     assert.equal(app.worker().lastMessage, undefined);
   } finally { app.restore(); }
 });
