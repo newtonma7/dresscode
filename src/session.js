@@ -151,6 +151,7 @@ export function createPreviewSession({ video, renderer, onStatus, onTracking, on
       if (id !== generation || owner.closed || resources !== owner) { release(owner); return; }
       owner.worker.postMessage({ type: 'init' });
     } catch (error) {
+      if (owner?.closed) return;
       if (owner) release(owner);
       else stream?.getTracks().forEach((track) => track.stop());
       if (id !== generation) return;
