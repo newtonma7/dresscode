@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fitTorso, garmentPoint, pointInArmCorridor } from '../src/geometry.js';
+import { fitTorso, garmentPoint, sleevePoint, pointInArmCorridor } from '../src/geometry.js';
 
 const pose = () => {
   const points = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 1 }));
@@ -74,6 +74,7 @@ test('anatomical label swapping preserves the image silhouette and arm occlusion
   assert.deepEqual(reversed.wrists, torso.wrists);
   for (const u of [0, 0.5, 1]) for (const v of [0, 0.3, 1]) {
     assert.deepEqual(garmentPoint(reversed, u, v), garmentPoint(torso, u, v));
+    for (const side of [0, 1]) assert.deepEqual(sleevePoint(reversed, side, u, v), sleevePoint(torso, side, u, v));
   }
   assert.equal(pointInArmCorridor(200, 610, reversed), true);
 });
@@ -108,7 +109,42 @@ test('valid fits stay finite over aspect ratios, fit controls, and missing elbow
       for (let row = 0; row <= 40; row++) for (let column = 0; column <= 40; column++) {
         const p = garmentPoint(torso, column / 40, row / 40);
         assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y));
+        for (const side of [0, 1]) {
+          const sleeve = sleevePoint(torso, side, column / 40, row / 40);
+          assert.ok(Number.isFinite(sleeve.x) && Number.isFinite(sleeve.y));
+        }
       }
+    }
+  }
+});
+
+test('sleeves share the body edge and follow each upper arm', () => {
+  for (const raised of [false, true]) {
+    const landmarks = pose();
+    if (raised) {
+      landmarks[13] = { x: 0.1, y: 0.25, visibility: 1 };
+      landmarks[14] = { x: 0.9, y: 0.25, visibility: 1 };
+    }
+    const torso = fitTorso(landmarks, { width: 1000, height: 1000 });
+    for (const side of [0, 1]) {
+      const top = garmentPoint(torso, side, 0);
+      const hem = garmentPoint(torso, side, 1);
+      assert.deepEqual(sleevePoint(torso, side, 0, 0), top);
+      for (const v of [0.2, 0.5, 1]) {
+        const seam = sleevePoint(torso, side, 0, v);
+        const cross = (seam.x - top.x) * (hem.y - top.y) - (seam.y - top.y) * (hem.x - top.x);
+        assert.ok(Math.abs(cross) < 1e-7, 'Sleeve attachment must stay on the body edge');
+      }
+      const a = sleevePoint(torso, side, 1, 0);
+      const b = sleevePoint(torso, side, 1, 1);
+      const cuff = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const shoulder = torso.shoulders[side];
+      const elbow = torso.elbows[side];
+      const dx = elbow.x - shoulder.x;
+      const dy = elbow.y - shoulder.y;
+      const progress = ((cuff.x - shoulder.x) * dx + (cuff.y - shoulder.y) * dy) / (dx * dx + dy * dy);
+      assert.ok(progress > 0.4 && progress < 0.65, 'Short sleeves must stop before the elbow');
+      assert.ok(distance(a, b) > torso.shoulderSpan * 0.25, 'Cuffs must have width, not collapse to a point');
     }
   }
 });
