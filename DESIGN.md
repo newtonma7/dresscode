@@ -20,7 +20,7 @@ The garment is an authored shallow mesh with a crew-neck opening, sleeves, navy 
 
 ## Synthesis decision
 
-Browser candidate is the base. It wins on runnable preview setup, permission UI, local assets, and lifecycle simplicity. Native output was written but its runner ended without a final response, so the artifact was read directly rather than treated as a successful run. Both candidates expose the same realism risk. Native candidate contributes sequence-matched frames and explicit unavailable tracking. Reject native Python packaging and direct V4L2 capture for this milestone. Cross-family judge skipped because the configured panel maps to the same GPT family; independent different-model review will still run.
+Browser candidate is the base. It wins on runnable preview setup, permission UI, local assets, and lifecycle simplicity. Native output was written but its runner ended without a final response, so the artifact was read directly rather than treated as a successful run. Both candidates expose the same realism risk. Native candidate contributes sequence-matched frames and explicit unavailable tracking. Reject native Python packaging and direct V4L2 capture for this milestone. Against the five criteria in `/tmp/dresscode-design-rubric.md`, browser scores 5, 4, 4, 5, 3 and native scores 3, 4, 5, 4, 5. Native has a shorter eventual virtual-camera path, but preview setup is the immediate gate. Cross-family judge skipped because the configured panel maps to the same GPT family; independent different-model review will still run.
 
 ## Tradeoffs accepted
 

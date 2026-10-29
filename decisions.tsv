@@ -2,3 +2,7 @@ ts	phase	decision	why	evidence	result
 2026-10-29T05:39:00Z	frame	Limit this run to a local preview	Realism must be tested before meeting integration	DESIGN.md	open
 2026-10-29T05:39:00Z	design	Choose browser-local over native Python	Camera permission and graphics setup need fewer platform adapters	/tmp/dresscode-design-browser.md; /tmp/dresscode-design-native.md	Sketches inspected; native runner ended without final response
 2026-10-29T05:39:00Z	assets	Download models and WASM during setup only	Webcam frames must remain local	 scripts/setup-assets.mjs	Install and asset setup passed
+2026-10-29T05:40:58Z	implementation	Delegate the preview to one isolated code owner	Camera, inference and rendering need one lifetime owner	DESIGN.md; agent a22b0c2210e759ace	Implementation in progress
+2026-10-29T05:40:58Z	verification	Use fake cameras for unattended browser checks	Avoid capturing the user while testing actual model code	/tmp/dresscode-qa/pose.jpg; /tmp/dresscode-qa/pose.y4m	Fixture prepared; physical camera not opened
+2026-10-29T05:41:53Z	verification	Use isolated headless Chrome with fake media	Ubuntu blocks the automation browser sandbox; test loopback only without real credentials	/tmp/dresscode-qa/; VERIFICATION.md	WebGL2 available through SwiftShader; not an AMD performance measurement
+2026-10-29T05:44:39Z	assets	Pin model bytes and reuse verified downloads	Setup should detect a damaged or changed model without downloading every run	scripts/setup-assets.mjs; THIRD_PARTY.md	Checksums verified and second setup run passed

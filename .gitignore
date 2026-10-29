@@ -5,3 +5,5 @@ public/wasm/
 *.log
 .claude/worktrees/
 todo.md
+
+.audit/
