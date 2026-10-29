@@ -99,8 +99,11 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
       if (id !== generation) return;
       resources && release(resources);
       renderer.clear();
-      status('error', error instanceof Error ? error.message : String(error));
-      onTracking({ torso: { kind: 'unavailable', reason: 'Camera unavailable' }, inferenceMs: null, mode: 'camera' });
+      const reason = error?.name === 'NotAllowedError'
+        ? 'Camera access was denied. Allow camera access for this site, then try again.'
+        : error instanceof Error ? error.message : String(error);
+      status('error', reason);
+      onTracking({ torso: { kind: 'unavailable', reason }, inferenceMs: null, mode: 'camera' });
     }
   }
 
