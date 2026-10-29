@@ -86,6 +86,19 @@ test('camera track ending clears preview and reports a reconnect action', async 
   } finally { app.restore(); }
 });
 
+test('tracking failures keep their actionable reason after cleanup', async () => {
+  const app = setup();
+  try {
+    await app.session.start();
+    app.worker().send({ type: 'failure', message: 'Model load failed. Run npm run assets and retry.' });
+
+    assert.equal(app.session.state, 'error');
+    assert.equal(app.video.srcObject, null);
+    assert.equal(app.statuses.at(-1).detail, 'Model load failed. Run npm run assets and retry.');
+    assert.equal(app.tracking.at(-1).torso.reason, 'Model load failed. Run npm run assets and retry.');
+  } finally { app.restore(); }
+});
+
 test('stopping during camera acquisition releases the late stream', async () => {
   const app = setup();
   let resolveCamera;
