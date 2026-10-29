@@ -7,6 +7,7 @@
 <script type="module">
 import { createRenderer } from '/src/render.js';
 import { fitTorso } from '/src/geometry.js';
+import { defaultTailoring } from '/src/tailoring.js';
 
 const results = document.getElementById('results');
 const checks = [];
@@ -73,6 +74,23 @@ try {
   const restored = sample(138, 460, foreground);
   assert(restored[0] === 255 && restored[1] === 0 && restored[2] === 0, 'Low-resolution alpha preserves full-resolution source RGB');
   assert(sample(300, 450, foreground)[3] === 0, 'Bare torso skin is not restored over the shirt');
+  for (const sleeveOpening of [75, 130]) {
+    renderer.render({ torso, tailoring: { ...defaultTailoring(), sleeveLength: 75, sleeveOpening } });
+    assert(sample(145, 360, foreground)[3] > 200, 'Short tailored sleeves restore exposed distal upper arm');
+    renderer.render({ torso, tailoring: { ...defaultTailoring(), sleeveLength: 135, sleeveOpening } });
+    assert(sample(145, 360)[3] > 200 && sample(145, 360, foreground)[3] === 0, 'Final long sleeve projection excludes skin for both opening extremes');
+    assert(sample(138, 460, foreground)[3] > 200, 'Long sleeve retains distal forearm restoration');
+    assert(sample(300, 450, foreground)[3] === 0, 'Tailoring never restores unrelated bare torso');
+  }
+  const readOnlyTailoring = { ...defaultTailoring(), sleeveLength: 135 };
+  renderer.render({ torso, tailoring: readOnlyTailoring });
+  readOnlyTailoring.sleeveLength = 75;
+  renderer.setEnabled(false);
+  renderer.setEnabled(true);
+  assert(sample(145, 360, foreground)[3] === 0, 'Renderer retains its own read-only tailoring value');
+  renderer.render({ bitmap, torso: { ...torso, head: { x: 145, y: 360 } }, mask: { width: 60, height: 80, data: new Uint8Array(4800).fill(3) } });
+  assert(sample(145, 360, foreground)[3] > 200, 'Sleeve exclusion does not erase face categories near the head');
+  renderer.render({ bitmap, torso, tailoring: defaultTailoring(), mask: { width: 60, height: 80, data: new Uint8Array(4800).fill(2) } });
   renderer.setSegmentation(false);
   assert(sample(138, 460, foreground)[3] === 0, 'Disabling segmentation immediately clears foreground pixels');
   renderer.setSegmentation(true);
