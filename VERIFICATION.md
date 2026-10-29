@@ -59,6 +59,10 @@ Automation used isolated headless Chrome with fake media, no real profile, and n
 
 ## Remaining gates
 
-Independent final review is pending. Meeting-quality realism and sustained performance remain NOT VERIFIED and are tracked in [issue 2](https://github.com/newtonma7/dresscode/issues/2). Virtual-camera output remains deferred. The build still reports a large-bundle advisory near 544 KB. No test fails because of that advisory.
+Independent code review found one additional P2 in uncaught worker error reporting. The parent reproduced `[object ErrorEvent]` with a genuinely faulting worker. The event boundary now retains its message. The production repeat displayed `Uncaught Error: Tracking worker boot failed. Run npm run assets.` in both status and tracking, released the stream, and reported no active camera. See `.audit/worker-error-before.png` and `.audit/worker-error-fixed.png`.
+
+The final source at 5f62138 passes 16 Node tests and the production build. Normal production inference and Stop passed again after the final error fix. A fresh independent reviewer confirmed the original finding resolved with no new blocking defects. The independent trail audit confirmed the rejected baseline, rejected stale-server check, corrected production inference, and test counts. Its remaining flags are the unverified real-world requirements, incomplete worker traffic capture, and unreliable side-turn rejection. Review used a different configured model, gpt-6-luna, not a cross-family panel.
+
+Five implementation and verification passes covered the initial preview, classic-worker lifecycle repair, permission-denial repair, garment and redraw repair, and final worker-error repair. The exit condition for the functional local preview is met. Meeting-quality realism and sustained performance remain NOT VERIFIED and are tracked in [issue 2](https://github.com/newtonma7/dresscode/issues/2). Virtual-camera output remains deferred. The build still reports a large-bundle advisory near 544 KB. No test fails because of that advisory.
 
 The final comment review left a HOLD on the explanatory body-skin comment in `src/geometry.js`. Synthetic masks prove the compositor does not restore torso skin, but actual bare-torso model behavior is not yet verified. The comment is retained pending that evaluation.
