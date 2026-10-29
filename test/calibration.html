@@ -36,6 +36,8 @@ try {
   assert(action('adjust').disabled && panel.textContent.includes('both shoulders'), 'No tracked frame gives a useful disabled-entry reason');
   await session.startDemo(createDemoFrame);
   assert(!action('adjust').disabled && session.editor.source === 'demo', 'The demo enters the shared tracked session');
+  const sourcePoints = session.editor.points;
+  assert([[11, 12], [13, 14], [23, 24]].every(([left, right]) => sourcePoints.find(({ id }) => id === left).point.x > sourcePoints.find(({ id }) => id === right).point.x), 'Front-facing demo source places anatomical left shoulders, elbows, and hips right of anatomical right');
   action('adjust').click();
   assert(session.state === 'editing' && document.activeElement.dataset.point === '11', 'Adjust freezes and focuses the first anatomical handle');
   const handle = document.querySelector('[data-point="11"]');
