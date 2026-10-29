@@ -52,6 +52,18 @@ try {
   assert(near(session.editor.points[0].point.y, .32 + 10 / 800), 'Shift-arrow nudges ten source pixels');
   session.setFit({ width: 1.2, length: 1.1, vertical: .1 });
   assert($('garment').toDataURL() !== garmentBefore && $('base').toDataURL() === baseBefore, 'Fit and corrections redraw immediately over the unchanged frozen source');
+  const frozenPoints = session.editor.points;
+  const fitBeforeReset = session.fit;
+  const defaultTailoring = session.tailoring;
+  const fittedGarment = $('garment').toDataURL();
+  session.setTailoring({ sleeveLength: 135, necklineWidth: 125, collarThickness: 150 });
+  assert($('garment').toDataURL() !== fittedGarment && $('base').toDataURL() === baseBefore, 'Tailoring redraws the same frozen source through the session');
+  session.resetFit();
+  assert(session.tailoring.sleeveLength === 135 && JSON.stringify(session.editor.points) === JSON.stringify(frozenPoints), 'Quick fit reset preserves Tailoring and draft body points');
+  session.setFit(fitBeforeReset);
+  session.resetTailoring();
+  assert(session.fit.width === 1.2 && JSON.stringify(session.tailoring) === JSON.stringify(defaultTailoring), 'Tailoring reset preserves Quick fit');
+  assert($('base').toDataURL() === baseBefore && JSON.stringify(session.editor.points) === JSON.stringify(frozenPoints), 'Scoped garment resets retain frozen pixels and corrections');
   action('cancel').click();
   assert(session.state === 'running' && near(session.editor.points[0].point.x, originalX), 'Cancel restores committed body points');
   await Promise.resolve();

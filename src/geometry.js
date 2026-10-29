@@ -51,6 +51,8 @@ export function fitTorso(landmarks, frame, fit = { width: 1, length: 1, vertical
     width: shoulderSpan * 1.14 * fit.width,
     height,
     shoulderSpan,
+    naturalHeight: naturalLength,
+    fit: { ...fit },
     shoulders,
     elbows: arms.map(([, elbow]) => elbow),
     wrists: arms.map(([, , wrist]) => wrist),
@@ -59,69 +61,33 @@ export function fitTorso(landmarks, frame, fit = { width: 1, length: 1, vertical
   };
 }
 
-export function pointInArmCorridor(x, y, torso, radius = 0.15) {
-  if (torso.kind !== 'torso') return false;
-  return torso.shoulders.some((shoulder, index) => {
+export function buildArmCorridors(torso, sleeves, radius = 0.15) {
+  const corridors = [];
+  torso.shoulders.forEach((shoulder, index) => {
     const elbow = torso.elbows[index];
-    if (!elbow) return false;
-    // Skin labels include the bare torso, so restore only a narrow distal upper arm.
-    const segments = [
-      { start: shoulder, end: elbow, minimum: 0.68, width: 0.65 },
-      { start: elbow, end: torso.wrists[index], minimum: 0, width: 1 },
-    ];
-    return segments.some(({ start, end, minimum, width }) => {
-      if (!end) return false;
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
+    if (!elbow) return;
+    const armLength = Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y);
+    if (armLength < 1) return;
+    const cutoff = Math.max(...sleeves[index].cuff.map(([px, py]) =>
+      ((px - shoulder.x) * (elbow.x - shoulder.x) + (py - shoulder.y) * (elbow.y - shoulder.y)) / armLength)) + torso.shoulderSpan * 0.015;
+    for (const { start, end, offset, width } of [
+      { start: shoulder, end: elbow, offset: 0, width: 0.65 },
+      { start: elbow, end: torso.wrists[index], offset: armLength, width: 1 },
+    ]) {
+      if (!end) continue;
+      const dx = end.x - start.x, dy = end.y - start.y;
       const length2 = dx * dx + dy * dy;
-      if (length2 < 1) return false;
-      const t = Math.max(0, Math.min(1, ((x - start.x) * dx + (y - start.y) * dy) / length2));
-      const px = start.x + t * dx;
-      const py = start.y + t * dy;
-      return t >= minimum && Math.hypot(x - px, y - py) < torso.shoulderSpan * radius * width;
-    });
+      const minimum = Math.max(0, (cutoff - offset) / Math.sqrt(length2));
+      if (length2 < 1 || minimum > 1) continue;
+      corridors.push({ x: start.x, y: start.y, dx, dy, length2, minimum, radius2: (torso.shoulderSpan * radius * width) ** 2 });
+    }
   });
+  return corridors;
 }
 
-function garmentAxes(torso) {
-  const [a, b] = torso.shoulders;
-  const length = Math.hypot(b.x - a.x, b.y - a.y);
-  const across = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
-  const down = { x: -across.y, y: across.x };
-  const origin = { x: torso.center.x - down.x * torso.height / 2, y: torso.center.y - down.y * torso.height / 2 };
-  return { across, down, origin };
-}
-
-export function garmentPoint(torso, u, v) {
-  const { across, down, origin } = garmentAxes(torso);
-  const topX = (u - 0.5) * torso.width;
-  const neckHalf = torso.shoulderSpan * 0.18;
-  const neck = Math.abs(topX) / neckHalf;
-  const topY = neck <= 1
-    ? torso.shoulderSpan * (-0.03 + 0.21 * Math.sqrt(Math.max(0, 1 - neck * neck)))
-    : -torso.shoulderSpan * 0.03 * (torso.width / 2 - Math.abs(topX)) / (torso.width / 2 - neckHalf);
-  const x = topX * (1 - 0.04 * v);
-  const y = topY + (torso.height - topY) * v;
-  return { x: origin.x + across.x * x + down.x * y, y: origin.y + across.y * x + down.y * y };
-}
-
-export function sleevePoint(torso, side, u, v) {
-  const { across, down, origin } = garmentAxes(torso);
-  const direction = side === 0 ? -1 : 1;
-  const shoulder = torso.shoulders[side];
-  const elbow = torso.elbows[side];
-  const armX = elbow ? elbow.x - shoulder.x : (across.x * direction * 0.35 + down.x) * torso.shoulderSpan;
-  const armY = elbow ? elbow.y - shoulder.y : (across.y * direction * 0.35 + down.y) * torso.shoulderSpan;
-  const armLength = Math.hypot(armX, armY);
-  const along = armLength > 1 ? { x: armX / armLength, y: armY / armLength } : down;
-  const outward = { x: direction * along.y, y: -direction * along.x };
-  const reach = Math.min(armLength * 0.58, torso.shoulderSpan * 0.55);
-  const shift = { x: origin.x - (torso.shoulders[0].x + torso.shoulders[1].x) / 2,
-    y: origin.y - (torso.shoulders[0].y + torso.shoulders[1].y) / 2 };
-  const cuffRadius = torso.width * 0.15;
-  const cuffX = shoulder.x + shift.x + along.x * reach + outward.x * torso.width * 0.025;
-  const cuffY = shoulder.y + shift.y + along.y * reach + outward.y * torso.width * 0.025;
-  const inner = garmentPoint(torso, side, v * Math.min(0.6, torso.shoulderSpan * 0.36 / torso.height));
-  const outer = { x: cuffX + outward.x * cuffRadius * (1 - 2 * v), y: cuffY + outward.y * cuffRadius * (1 - 2 * v) };
-  return { x: inner.x + (outer.x - inner.x) * u, y: inner.y + (outer.y - inner.y) * u };
+export function pointInArmCorridor(x, y, corridors) {
+  return corridors.some((c) => {
+    const t = Math.max(0, Math.min(1, ((x - c.x) * c.dx + (y - c.y) * c.dy) / c.length2));
+    return t >= c.minimum && (x - c.x - t * c.dx) ** 2 + (y - c.y - t * c.dy) ** 2 < c.radius2;
+  });
 }

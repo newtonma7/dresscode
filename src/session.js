@@ -1,10 +1,22 @@
 import { fitTorso } from './geometry.js';
+import { defaultTailoring, tailoringSnapshot } from './tailoring.js';
 import { BODY_POINTS, correctedLandmarks, correctionForPoint, shoulderBasis, usablePoint } from './calibration.js';
+
+const DEFAULT_FIT = Object.freeze({ width: 1, length: 1, vertical: 0 });
+const FIT_RANGES = { width: [.82, 1.22], length: [.82, 1.22], vertical: [-.18, .18] };
+
+function fitSnapshot(current, next) {
+  for (const [key, value] of Object.entries(next)) {
+    const range = FIT_RANGES[key];
+    if (!Object.hasOwn(FIT_RANGES, key) || !Number.isFinite(value) || value < range[0] || value > range[1]) throw new RangeError(`Invalid fit value for ${key}`);
+  }
+  return Object.freeze({ ...current, ...next });
+}
 
 export function createPreviewSession({ video, renderer, onStatus, onTracking, onEditor = () => {} }) {
   const preview = {
     source: 'none', phase: 'stopped', observation: null,
-    fit: { width: 1, length: 1, vertical: 0 }, corrections: {}, edit: null,
+    fit: DEFAULT_FIT, tailoring: defaultTailoring(), corrections: {}, edit: null,
   };
   let generation = 0;
   let resources;
@@ -75,7 +87,7 @@ export function createPreviewSession({ video, renderer, onStatus, onTracking, on
   function redraw() {
     if (!preview.observation) return;
     const torso = torsoFor(preview.observation);
-    renderer.render({ torso });
+    renderer.render({ torso, tailoring: preview.tailoring });
     report(torso);
   }
 
@@ -90,7 +102,7 @@ export function createPreviewSession({ video, renderer, onStatus, onTracking, on
     if (torso.kind === 'torso') {
       preview.observation = observation;
       renderer.render({
-        bitmap: data.bitmap, torso,
+        bitmap: data.bitmap, torso, tailoring: preview.tailoring,
         mask: occlusion && data.mask ? {
           data: data.mask instanceof Uint8Array ? data.mask : new Uint8Array(data.mask),
           width: data.maskWidth, height: data.maskHeight,
@@ -244,7 +256,12 @@ export function createPreviewSession({ video, renderer, onStatus, onTracking, on
     },
     get state() { return preview.phase; },
     get editor() { return editorView(); },
-    setFit(next) { preview.fit = next; redraw(); },
+    get fit() { return preview.fit; },
+    get tailoring() { return preview.tailoring; },
+    setFit(next) { preview.fit = fitSnapshot(preview.fit, next); redraw(); },
+    resetFit() { preview.fit = DEFAULT_FIT; redraw(); },
+    setTailoring(next) { preview.tailoring = tailoringSnapshot(preview.tailoring, next); redraw(); },
+    resetTailoring() { preview.tailoring = defaultTailoring(); redraw(); },
     setOcclusion(value) {
       if (occlusion === value) return;
       occlusion = value;
