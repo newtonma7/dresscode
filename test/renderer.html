@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Renderer browser regressions</title>
+<body>
+<pre id="results">Running renderer regressions</pre>
+<script type="module">
+import { createRenderer } from '/src/render.js';
+import { fitTorso } from '/src/geometry.js';
+
+const results = document.getElementById('results');
+const checks = [];
+const assert = (condition, message) => {
+  if (!condition) throw new Error(message);
+  checks.push(message);
+};
+const canvas = () => Object.assign(document.createElement('canvas'), { width: 600, height: 800 });
+let renderer;
+try {
+  const base = canvas();
+  const garment = canvas();
+  const foreground = canvas();
+  document.body.append(base, garment, foreground);
+  renderer = createRenderer({ base, garment, foreground });
+  renderer.setEnabled(false);
+  renderer.setEnabled(true);
+  renderer.setSegmentation(false);
+  renderer.setSegmentation(true);
+  assert(true, 'Toggles before any frame do not throw');
+
+  const source = canvas();
+  const sourceContext = source.getContext('2d');
+  sourceContext.fillStyle = '#c99373';
+  sourceContext.fillRect(0, 0, 600, 800);
+  const landmarks = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 0 }));
+  for (const [index, x, y] of [[11, .32, .32], [12, .68, .32], [13, .24, .49], [14, .76, .49], [15, .21, .70], [16, .79, .70], [23, .35, .78], [24, .65, .78]]) {
+    landmarks[index] = { x, y, visibility: 1 };
+  }
+  const torso = fitTorso(landmarks, source);
+  const bitmap = await createImageBitmap(source);
+  let closed = 0;
+  const close = bitmap.close.bind(bitmap);
+  bitmap.close = () => { closed++; close(); };
+  const sampleCanvas = canvas();
+  const sampleContext = sampleCanvas.getContext('2d');
+  const sample = (x, y) => {
+    sampleContext.clearRect(0, 0, 600, 800);
+    sampleContext.drawImage(garment, 0, 0, 600, 800);
+    return sampleContext.getImageData(x, y, 1, 1).data;
+  };
+  renderer.render({ bitmap, torso });
+  assert(sample(210, 450)[3] > 200 && sample(390, 450)[3] > 200, 'Shirt covers both torso edges below the sleeves');
+  assert(sample(300, 260)[3] === 0, 'Neck opening reaches the top boundary');
+  assert(sample(300, 330)[3] > 200, 'Fabric exists below the neck');
+  assert(sample(145, 320)[3] > 200 && sample(455, 320)[3] > 200, 'Both short sleeves cover the upper arms');
+  assert(sample(124, 500)[3] === 0, 'Lower arms remain outside the garment');
+  renderer.setEnabled(false);
+  assert(sample(300, 450)[3] === 0, 'Disabling immediately clears the overlay');
+  assert(base.getContext('2d').getImageData(300, 450, 1, 1).data[0] === 201, 'Disabling preserves the current source image');
+  renderer.setEnabled(true);
+  assert(sample(300, 450)[3] > 200, 'Re-enabling redraws the retained frame');
+  renderer.setSegmentation(false);
+  renderer.setSegmentation(true);
+  assert(closed === 0 && bitmap.width === 600, 'Redraws do not close the retained bitmap');
+  renderer.render({ bitmap, torso });
+  assert(closed === 0, 'Rendering the same bitmap does not close it');
+
+  const next = await createImageBitmap(source);
+  renderer.render({ bitmap: next, torso: { kind: 'unavailable', reason: 'No pose' } });
+  assert(closed === 1 && next.width === 0, 'Unavailable tracking releases both old and incoming bitmaps');
+  assert(sample(300, 450)[3] === 0, 'No pose clears stale garment pixels');
+  assert(base.getContext('2d').getImageData(300, 450, 1, 1).data[0] !== 201, 'No pose clears the source image to neutral');
+
+  for (const shift of [-1.6, 0, 1.6, 0]) {
+    const moved = landmarks.map((point) => ({ ...point, x: point.x + shift }));
+    renderer.render({ bitmap: await createImageBitmap(source), torso: fitTorso(moved, source) });
+    if (shift === 0) assert(sample(300, 450)[3] > 200, 'The deformed mesh returns from offscreen without stale-bound culling');
+  }
+  renderer.clear();
+  renderer.setEnabled(false);
+  renderer.setSegmentation(false);
+  assert(sample(300, 450)[3] === 0, 'Clear followed by toggles stays neutral');
+  renderer.dispose();
+  renderer.dispose();
+  renderer = undefined;
+  assert(true, 'Disposal is idempotent');
+
+  let contextError;
+  try {
+    createRenderer({ base: { getContext: () => null }, garment: canvas(), foreground: canvas() });
+  } catch (error) { contextError = error.message; }
+  assert(/2D.*canvas/i.test(contextError), 'Missing canvas contexts have an actionable error');
+  results.textContent = `PASS ${checks.length} renderer checks\n${checks.join('\n')}`;
+  document.documentElement.dataset.result = 'pass';
+} catch (error) {
+  results.textContent = `FAIL after ${checks.length} checks\n${error.stack}`;
+  document.documentElement.dataset.result = 'fail';
+} finally {
+  renderer?.dispose();
+}
+</script>
+</body>
+</html>
