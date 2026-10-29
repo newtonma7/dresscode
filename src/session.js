@@ -92,7 +92,7 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
         else { data.bitmap.close(); renderer.clear(); }
         schedule(owner);
       };
-      owner.worker.onerror = (error) => fail(owner, error);
+      owner.worker.onerror = (event) => fail(owner, new Error(event.message || 'Tracking worker failed. Run npm run assets and try again.'));
       owner.worker.postMessage({ type: 'init' });
     } catch (error) {
       if (stream) stream.getTracks().forEach((track) => track.stop());
