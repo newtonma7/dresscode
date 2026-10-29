@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101317" />
+    <title>Dresscode Studio | Local shirt preview</title>
+  </head>
+  <body>
+    <main class="studio">
+      <header class="topbar">
+        <a class="wordmark" href="#" aria-label="Dresscode Studio home"><span class="mark">D</span> dresscode <span class="wordmark-muted">/ studio</span></a>
+        <span class="local-pill"><span></span> LOCAL PREVIEW</span>
+      </header>
+      <section class="workspace" aria-label="Shirt preview studio">
+        <aside class="rail">
+          <p class="eyebrow">GARMENT STUDY / 001</p>
+          <h1>The everyday<br />crew neck.</h1>
+          <p class="intro">A live fit sketch in deep navy. See how a simple silhouette sits on you before a meeting.</p>
+          <div class="garment-card">
+            <div class="swatch-shirt" aria-hidden="true"><span></span></div>
+            <div><strong>Classic crew</strong><small>Midweight · Navy</small></div>
+            <span class="color-dot" aria-label="Navy"></span>
+          </div>
+          <div class="controls">
+            <div class="control-title"><span>FIT ADJUSTMENTS</span><span class="unit">LIVE</span></div>
+            <label class="slider-row" for="width"><span>Width</span><output id="widthValue">100%</output><input id="width" type="range" min="82" max="122" value="100" /></label>
+            <label class="slider-row" for="length"><span>Length</span><output id="lengthValue">100%</output><input id="length" type="range" min="82" max="122" value="100" /></label>
+            <label class="slider-row" for="vertical"><span>Vertical fit</span><output id="verticalValue">0</output><input id="vertical" type="range" min="-18" max="18" value="0" /></label>
+          </div>
+          <div class="options">
+            <label class="toggle-row"><span>Garment overlay</span><input id="garmentToggle" type="checkbox" checked /><i></i></label>
+            <label class="toggle-row"><span>Arm &amp; face occlusion</span><input id="segmentationToggle" type="checkbox" checked /><i></i></label>
+            <label class="toggle-row"><span>Mirror preview</span><input id="mirrorToggle" type="checkbox" checked /><i></i></label>
+          </div>
+          <div class="camera-controls">
+            <label class="eyebrow" for="cameraSelect">CAMERA</label>
+            <select id="cameraSelect" disabled><option value="">Default camera</option></select>
+            <div class="button-row"><button id="startButton" class="button-primary">Start camera</button><button id="stopButton" class="button-secondary" disabled>Stop</button></div>
+            <button id="demoButton" class="demo-button">Try the camera-free demo <span>↗</span></button>
+          </div>
+          <p class="feasibility"><span class="info-icon">i</span><span><strong>Feasibility preview only.</strong> Fit, skin and arm masking are approximate. This is not ready for meetings.</span></p>
+        </aside>
+        <section class="preview-column" aria-label="Preview output">
+          <div class="preview-head"><span>LIVE FIT VIEW</span><span class="frame-count">NOT RECORDING</span></div>
+          <div class="stage" id="stage">
+            <canvas id="baseCanvas" aria-label="Preview image"></canvas>
+            <canvas id="garmentCanvas" aria-hidden="true"></canvas>
+            <canvas id="foregroundCanvas" aria-hidden="true"></canvas>
+            <video id="cameraVideo" autoplay muted playsinline></video>
+            <div class="empty-state" id="emptyState"><div class="empty-orbit"><span></span></div><p>Your preview appears here</p><small>Camera stays on this device. Nothing is saved.</small></div>
+            <div class="status-chip" id="trackingStatus"><span class="status-indicator"></span><span id="statusText">Stopped</span><span class="status-time" id="inferenceTime"></span></div>
+            <div class="reason" id="trackingReason" hidden></div>
+            <div class="demo-badge" id="demoBadge" hidden>SIMULATED PERSON · NO CAMERA / NO INFERENCE</div>
+          </div>
+          <div class="preview-foot"><span>Fit adjusts to visible shoulder &amp; torso landmarks</span><span id="sourceLabel">No camera active</span></div>
+        </section>
+      </section>
+      <footer class="footer"><span>Dresscode Studio</span><span>Local by design · Preview, not a virtual camera</span></footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
