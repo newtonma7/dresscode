@@ -86,6 +86,24 @@ test('camera track ending clears preview and reports a reconnect action', async 
   } finally { app.restore(); }
 });
 
+test('camera permission denial keeps an actionable reason in status and tracking', async () => {
+  const app = setup();
+  try {
+    navigator.mediaDevices.getUserMedia = async () => {
+      throw new DOMException('Permission denied', 'NotAllowedError');
+    };
+
+    await app.session.start();
+
+    const reason = 'Camera access was denied. Allow camera access for this site, then try again.';
+    assert.equal(app.session.state, 'error');
+    assert.equal(app.statuses.at(-1).detail, reason);
+    assert.equal(app.tracking.at(-1).torso.reason, reason);
+    assert.equal(app.video.srcObject, null);
+    assert.equal(FakeWorker.instances.length, 0);
+  } finally { app.restore(); }
+});
+
 test('tracking failures keep their actionable reason after cleanup', async () => {
   const app = setup();
   try {
