@@ -37,6 +37,8 @@ try {
     landmarks[index] = { x, y, visibility: 1 };
   }
   const torso = fitTorso(landmarks, source);
+  sourceContext.fillStyle = '#ff0000';
+  sourceContext.fillRect(138, 460, 1, 1);
   const bitmap = await createImageBitmap(source);
   let closed = 0;
   const close = bitmap.close.bind(bitmap);
@@ -62,11 +64,13 @@ try {
   renderer.render({ bitmap, torso, mask: { width: 60, height: 80, data: new Uint8Array(4800).fill(2) } });
   assert(sample(145, 380, foreground)[3] > 200, 'Exposed upper-arm skin is foreground below the short sleeve');
   assert(sample(138, 460, foreground)[3] > 200, 'Forearm skin is foreground');
+  const restored = sample(138, 460, foreground);
+  assert(restored[0] === 255 && restored[1] === 0 && restored[2] === 0, 'Low-resolution alpha preserves full-resolution source RGB');
   assert(sample(300, 450, foreground)[3] === 0, 'Bare torso skin is not restored over the shirt');
   renderer.setSegmentation(false);
   assert(sample(138, 460, foreground)[3] === 0, 'Disabling segmentation immediately clears foreground pixels');
   renderer.setSegmentation(true);
-  assert(sample(138, 460, foreground)[3] > 200, 'Re-enabling segmentation redraws the retained mask');
+  assert(sample(138, 460, foreground)[3] === 0, 'Re-enabling segmentation does not restore an old mask');
   assert(closed === 0 && bitmap.width === 600, 'Redraws do not close the retained bitmap');
   renderer.render({ bitmap, torso });
   assert(closed === 0, 'Rendering the same bitmap does not close it');

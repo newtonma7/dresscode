@@ -38,12 +38,13 @@ function showStatus(state, detail = '') {
   }
 }
 
-function showTracking({ torso, inferenceMs, mode }) {
+function showTracking({ torso, inferenceMs, processingMs, timings, delegate, delegateReason, hardware, mode }) {
   const valid = torso.kind === 'torso';
   $('trackingReason').hidden = valid;
   $('trackingReason').textContent = valid ? '' : torso.reason;
   $('statusText').textContent = demoActive ? 'Simulated tracking' : valid ? 'Torso tracked' : torso.reason;
-  $('inferenceTime').textContent = mode === 'camera' && inferenceMs !== null ? `${Math.round(inferenceMs)} ms inference` : '';
+  $('inferenceTime').textContent = mode === 'camera' && inferenceMs != null ? `${Math.round(processingMs)} ms processing · ${delegate}` : '';
+  $('inferenceTime').title = timings ? `Pose ${timings.poseMs.toFixed(1)} ms; segmentation submit ${timings.segmentSubmitMs.toFixed(1)} ms; mask readback ${timings.maskReadbackMs.toFixed(1)} ms; worker total ${timings.workerTotalMs.toFixed(1)} ms. ${delegateReason}. ${hardware}` : '';
   $('trackingStatus').classList.toggle('active', valid || demoActive);
   $('emptyState').hidden = valid || demoActive;
 }
@@ -54,7 +55,7 @@ session = createSession({
 
 for (const input of Object.values(controls)) input.addEventListener('input', setFit);
 $('garmentToggle').addEventListener('change', (event) => renderer.setEnabled(event.target.checked));
-$('segmentationToggle').addEventListener('change', (event) => renderer.setSegmentation(event.target.checked));
+$('segmentationToggle').addEventListener('change', (event) => session.setOcclusion(event.target.checked));
 $('mirrorToggle').addEventListener('change', (event) => stage.classList.toggle('mirrored', event.target.checked));
 stage.classList.toggle('mirrored', $('mirrorToggle').checked);
 

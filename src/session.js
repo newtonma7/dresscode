@@ -21,6 +21,8 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
   let resources;
   let fit = { width: 1, length: 1, vertical: 0 };
   let smoothed;
+  let occlusion = true;
+  let revision = 0;
 
   function status(next, detail = '') {
     state = next;
@@ -28,7 +30,7 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
   }
 
   function release(owner = resources) {
-    if (!owner) return;
+    if (!owner || owner.closed) return;
     const wasCurrent = resources === owner;
     owner.closed = true;
     if (owner.frameId && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(owner.frameId);
@@ -65,8 +67,6 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
       owner.videoTrack?.addEventListener('ended', owner.onTrackEnded);
       if (owner.videoTrack?.readyState === 'ended') { owner.onTrackEnded(); return; }
       video.srcObject = stream;
-      await video.play();
-      if (id !== generation || owner.closed || resources !== owner) { release(owner); return; }
       owner.worker.onmessage = ({ data }) => {
         if (owner.closed || resources !== owner) { data.bitmap?.close(); return; }
         if (data.type === 'ready') {
@@ -80,19 +80,23 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
           return;
         }
         owner.inFlight = false;
+        if (data.revision !== revision) { data.bitmap?.close(); schedule(owner); return; }
         const torso = data.landmarks ? fitTorso(data.landmarks, data.bitmap, fit) : { kind: 'unavailable', reason: 'No person detected' };
         const next = torso.kind === 'torso' ? blend(smoothed, torso, 0.38) : torso;
         smoothed = next.kind === 'torso' ? next : undefined;
-        onTracking({ torso: next, inferenceMs: data.inferenceMs, mode: 'camera' });
         if (next.kind === 'torso') renderer.render({
           bitmap: data.bitmap,
           torso: next,
-          mask: { data: new Uint8Array(data.mask), width: data.maskWidth, height: data.maskHeight },
+          mask: data.mask ? { data: new Uint8Array(data.mask), width: data.maskWidth, height: data.maskHeight } : undefined,
         });
         else { data.bitmap.close(); renderer.clear(); }
+        const processingMs = performance.now() - data.capturedAt;
+        onTracking({ torso: next, inferenceMs: data.inferenceMs, processingMs, timings: data.timings, delegate: data.delegate, delegateReason: data.delegateReason, hardware: data.hardware, mode: 'camera' });
         schedule(owner);
       };
       owner.worker.onerror = (event) => fail(owner, new Error(event.message || 'Tracking worker failed. Run npm run assets and try again.'));
+      await video.play();
+      if (id !== generation || owner.closed || resources !== owner) { release(owner); return; }
       owner.worker.postMessage({ type: 'init' });
     } catch (error) {
       if (stream) stream.getTracks().forEach((track) => track.stop());
@@ -113,11 +117,13 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
       owner.frameId = 0;
       if (owner.closed || owner.inFlight) return;
       owner.inFlight = true;
+      const frameRevision = revision;
+      const capturedAt = performance.now();
       try {
         const bitmap = await createImageBitmap(video);
         if (owner.closed) { bitmap.close(); return; }
         const timestamp = Number.isFinite(metadata?.mediaTime) ? metadata.mediaTime * 1000 : performance.now();
-        owner.worker.postMessage({ type: 'frame', id: timestamp, timestamp, bitmap }, [bitmap]);
+        owner.worker.postMessage({ type: 'frame', id: timestamp, timestamp, bitmap, capturedAt, revision: frameRevision, occlusion }, [bitmap]);
       } catch (error) {
         owner.inFlight = false;
         fail(owner, error);
@@ -149,5 +155,11 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
     stop,
     get state() { return state; },
     setFit(next) { fit = next; smoothed = undefined; },
+    setOcclusion(value) {
+      if (occlusion === value) return;
+      occlusion = value;
+      revision += 1;
+      renderer.setSegmentation(value);
+    },
   };
 }

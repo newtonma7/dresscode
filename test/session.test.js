@@ -46,6 +46,7 @@ function setup() {
   const prior = {
     navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'),
     Worker: Object.getOwnPropertyDescriptor(globalThis, 'Worker'),
+    createImageBitmap: Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap'),
   };
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
@@ -62,6 +63,8 @@ function setup() {
     restore() {
       if (prior.navigator) Object.defineProperty(globalThis, 'navigator', prior.navigator);
       else delete globalThis.navigator;
+      if (prior.createImageBitmap) Object.defineProperty(globalThis, 'createImageBitmap', prior.createImageBitmap);
+      else delete globalThis.createImageBitmap;
       if (prior.Worker) Object.defineProperty(globalThis, 'Worker', prior.Worker);
       else delete globalThis.Worker;
     },
@@ -187,5 +190,48 @@ test('a stopped camera owner cannot fail the replacement session', async () => {
     assert.equal(app.session.state, 'running');
     assert.equal(app.video.srcObject, replacement);
     assert.equal(replacementTrack.stopped, 0);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('an early worker loader error during pending playback stops startup', async () => {
+  const app = setup();
+  let resolvePlay;
+  try {
+    app.video.play = () => new Promise((resolve) => { resolvePlay = resolve; });
+    const starting = app.session.start();
+    await Promise.resolve();
+    app.worker().onerror({ message: 'Early loader failure' });
+    resolvePlay();
+    await starting;
+    assert.equal(app.session.state, 'error');
+    assert.equal(app.track.stopped, 1);
+    assert.equal(app.worker().lastMessage, undefined);
+  } finally { app.restore(); }
+});
+
+test('occlusion revisions discard an in-flight old mask and capture the new intent', async () => {
+  const app = setup();
+  let capture;
+  let closed = 0;
+  const segmentation = [];
+  try {
+    app.renderer.setSegmentation = (value) => segmentation.push(value);
+    app.video.requestVideoFrameCallback = (callback) => { capture = callback; return 1; };
+    globalThis.createImageBitmap = async () => ({ width: 640, height: 480, close() { closed++; } });
+    await app.session.start();
+    const worker = app.worker();
+    worker.send({ type: 'ready' });
+    await capture(0, { mediaTime: 1 });
+    const first = worker.lastMessage;
+    assert.equal(first.occlusion, true);
+    app.session.setOcclusion(false);
+    app.session.setOcclusion(true);
+    worker.send({ ...first, type: 'result', landmarks: null, mask: new ArrayBuffer(10) });
+    assert.equal(closed, 1);
+    assert.equal(app.tracking.length, 0);
+    await capture(0, { mediaTime: 2 });
+    assert.equal(worker.lastMessage.occlusion, true);
+    assert.notEqual(worker.lastMessage.revision, first.revision);
+    assert.deepEqual(segmentation, [false, true]);
   } finally { app.session.stop(); app.restore(); }
 });
