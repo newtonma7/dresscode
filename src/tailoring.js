@@ -14,7 +14,7 @@ export const defaultTailoring = () => Object.freeze(Object.fromEntries(Object.en
 export function tailoringSnapshot(current, next) {
   for (const [key, value] of Object.entries(next)) {
     const spec = TAILORING[key];
-    if (!spec || !Number.isFinite(value) || value < spec.min || value > spec.max) throw new RangeError(`Invalid tailoring value for ${key}`);
+    if (!Object.hasOwn(TAILORING, key) || !Number.isFinite(value) || value < spec.min || value > spec.max) throw new RangeError(`Invalid tailoring value for ${key}`);
   }
   return Object.freeze({ ...current, ...next });
 }

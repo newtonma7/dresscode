@@ -12,6 +12,12 @@
         <a class="wordmark" href="#" aria-label="Dresscode Studio home"><span class="mark">D</span> dresscode <span class="wordmark-muted">/ studio</span></a>
         <span class="local-pill"><span></span> LOCAL PREVIEW</span>
       </header>
+      <div class="camera-controls" role="group" aria-label="Preview source">
+        <label class="eyebrow" for="cameraSelect">CAMERA</label>
+        <select id="cameraSelect" disabled><option value="">Default camera</option></select>
+        <div class="button-row"><button id="startButton" class="button-primary">Start camera</button><button id="stopButton" class="button-secondary" disabled>Stop</button></div>
+        <button id="demoButton" class="demo-button">Try the camera-free demo <span>↗</span></button>
+      </div>
       <section class="workspace" aria-label="Shirt preview studio">
         <aside class="rail">
           <p class="eyebrow">GARMENT STUDY / 001</p>
@@ -23,21 +29,21 @@
             <span class="color-dot" aria-label="Navy"></span>
           </div>
           <div class="controls">
-            <div class="control-title"><span>FIT ADJUSTMENTS</span><span class="unit">LIVE</span></div>
-            <label class="slider-row" for="width"><span>Width</span><output id="widthValue">100%</output><input id="width" type="range" min="82" max="122" value="100" /></label>
-            <label class="slider-row" for="length"><span>Length</span><output id="lengthValue">100%</output><input id="length" type="range" min="82" max="122" value="100" /></label>
-            <label class="slider-row" for="vertical"><span>Vertical fit</span><output id="verticalValue">0</output><input id="vertical" type="range" min="-18" max="18" value="0" /></label>
+            <div class="control-title"><h2>Quick fit</h2><button id="resetFit" class="reset-button" type="button">Reset fit</button></div>
+            <div class="slider-row"><label for="width">Width</label><output id="widthValue" aria-hidden="true">100%</output><input id="width" type="range" min="82" max="122" value="100" /></div>
+            <div class="slider-row"><label for="length">Length</label><output id="lengthValue" aria-hidden="true">100%</output><input id="length" type="range" min="82" max="122" value="100" /></div>
+            <div class="slider-row"><label for="vertical">Vertical fit</label><output id="verticalValue" aria-hidden="true">0% span</output><input id="vertical" type="range" min="-18" max="18" value="0" /></div>
           </div>
+          <details class="tailoring">
+            <summary>Tailoring</summary>
+            <p id="tailoringHelp" class="control-help">Percentages adjust this style, not body measurements. Chest ease and vertical fit use shoulder span. Slope uses degrees.</p>
+            <button id="resetTailoring" class="reset-button" type="button">Reset tailoring</button>
+            <div id="tailoringControls"></div>
+          </details>
           <div class="options">
             <label class="toggle-row"><span>Garment overlay</span><input id="garmentToggle" type="checkbox" checked /><i></i></label>
             <label class="toggle-row"><span>Arm &amp; face occlusion</span><input id="segmentationToggle" type="checkbox" checked /><i></i></label>
             <label class="toggle-row"><span>Mirror preview</span><input id="mirrorToggle" type="checkbox" checked /><i></i></label>
-          </div>
-          <div class="camera-controls">
-            <label class="eyebrow" for="cameraSelect">CAMERA</label>
-            <select id="cameraSelect" disabled><option value="">Default camera</option></select>
-            <div class="button-row"><button id="startButton" class="button-primary">Start camera</button><button id="stopButton" class="button-secondary" disabled>Stop</button></div>
-            <button id="demoButton" class="demo-button">Try the camera-free demo <span>↗</span></button>
           </div>
           <p class="feasibility"><span class="info-icon">i</span><span><strong>Feasibility preview only.</strong> Fit, skin and arm masking are approximate. This is not ready for meetings.</span></p>
         </aside>
@@ -54,7 +60,9 @@
             <div class="reason" id="trackingReason" hidden></div>
             <div class="demo-badge" id="demoBadge" hidden>SIMULATED PERSON · NO CAMERA / NO INFERENCE</div>
           </div>
-          <div id="calibrationControls" class="calibration-controls">
+          <div id="calibrationControls" class="calibration-controls" role="group" aria-labelledby="trackingTitle">
+            <h2 id="trackingTitle">Tracking</h2>
+            <p class="tracking-description">Correct body points independently of garment fit and tailoring.</p>
             <div class="calibration-buttons">
               <button class="button-secondary" data-action="adjust" disabled>Adjust tracking</button>
               <button class="button-primary" data-action="apply" hidden>Apply and resume</button>

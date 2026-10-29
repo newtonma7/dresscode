@@ -90,6 +90,23 @@ try {
   assert(sample(145, 360, foreground)[3] === 0, 'Renderer retains its own read-only tailoring value');
   renderer.render({ bitmap, torso: { ...torso, head: { x: 145, y: 360 } }, mask: { width: 60, height: 80, data: new Uint8Array(4800).fill(3) } });
   assert(sample(145, 360, foreground)[3] > 200, 'Sleeve exclusion does not erase face categories near the head');
+  for (const mode of ['roll', 'cross']) {
+    const moved = structuredClone(landmarks);
+    if (mode === 'cross') {
+      moved[13].x = .6; moved[14].x = .4;
+      moved[15].x = .75; moved[16].x = .25;
+    } else {
+      for (const point of moved) {
+        const x = point.x * 600 - 300, y = point.y * 800 - 400;
+        point.x = (300 + x * Math.cos(.45) - y * Math.sin(.45)) / 600;
+        point.y = (400 + x * Math.sin(.45) + y * Math.cos(.45)) / 800;
+      }
+    }
+    renderer.render({ bitmap, torso: fitTorso(moved, source), tailoring: { ...defaultTailoring(), sleeveLength: 135, sleeveOpening: 130 }, mask: { width: 60, height: 80, data: new Uint8Array(4800).fill(2) } });
+    const [x, y] = mode === 'roll' ? [180, 310] : [270, 360];
+    assert(sample(x, y)[3] > 200 && sample(x, y, foreground)[3] === 0, `${mode} sleeve excludes skin even where distal corridors cross its projection`);
+    assert(sample(300, 450, foreground)[3] === 0, `${mode} does not restore unrelated torso skin`);
+  }
   renderer.render({ bitmap, torso, tailoring: defaultTailoring(), mask: { width: 60, height: 80, data: new Uint8Array(4800).fill(2) } });
   renderer.setSegmentation(false);
   assert(sample(138, 460, foreground)[3] === 0, 'Disabling segmentation immediately clears foreground pixels');

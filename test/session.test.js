@@ -430,3 +430,109 @@ test('a late demo bitmap cannot replace a stopped or replacement source', async 
     assert.equal(app.session.state, 'stopped');
   } finally { app.restore(); }
 });
+
+test('Quick fit and Tailoring resets redraw the frozen source without changing draft corrections or each other', async () => {
+  const app = setup();
+  try {
+    const shown = await trackedCamera(app);
+    const defaults = app.session.tailoring;
+    assert.ok(Object.isFrozen(app.renders.at(-1).tailoring));
+    app.session.beginCalibration();
+    app.session.movePoint(13, { x: .1, y: .55 });
+    const draft = app.session.editor.points;
+    app.session.setFit({ width: 1.2, length: 1.1, vertical: .1 });
+    app.session.setTailoring({ sleeveLength: 135, necklineWidth: 125 });
+    assert.equal(app.renders.at(-1).tailoring.sleeveLength, 135);
+    assert.equal(app.renders.at(-1).bitmap, undefined);
+    assert.equal(app.renders.at(-1).torso.elbows[0].x, 60);
+    app.session.resetFit();
+    assert.deepEqual(app.session.fit, { width: 1, length: 1, vertical: 0 });
+    assert.equal(app.session.tailoring.sleeveLength, 135);
+    assert.deepEqual(app.session.editor.points, draft);
+    app.session.setFit({ width: 1.12 });
+    const fitted = app.renders.at(-1).torso;
+    app.session.resetTailoring();
+    assert.deepEqual(app.session.tailoring, defaults);
+    assert.equal(app.session.fit.width, 1.12);
+    assert.deepEqual(app.renders.at(-1).torso, fitted);
+    assert.deepEqual(app.session.editor.points, draft);
+    assert.equal(shown.bitmap.closed, 0);
+    app.session.finishCalibration(false);
+    assert.equal(app.session.fit.width, 1.12);
+    assert.deepEqual(app.session.tailoring, defaults);
+    assert.equal(app.renders.at(-1).torso.elbows[0].x, 120);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('calibration apply, cancel and reset retain garment preferences and source replacement clears only corrections', async () => {
+  const app = setup();
+  try {
+    app.session.setFit({ length: 1.08, vertical: -.1 });
+    app.session.setTailoring({ shoulderSlope: 22, chestEase: 18 });
+    await trackedCamera(app);
+    const fit = app.session.fit, tailoring = app.session.tailoring;
+    app.session.beginCalibration();
+    app.session.movePoint(11, { x: .2, y: .35 });
+    app.session.finishCalibration(true);
+    await replyFrame(app);
+    app.session.beginCalibration();
+    app.session.resetCorrections();
+    app.session.finishCalibration(false);
+    assert.equal(app.session.editor.hasCorrections, true);
+    app.session.resetCorrections();
+    assert.equal(app.session.editor.hasCorrections, false);
+    assert.equal(app.session.fit, fit);
+    assert.equal(app.session.tailoring, tailoring);
+    app.session.beginCalibration();
+    app.session.movePoint(13, { x: .1, y: .6 });
+    app.session.finishCalibration(true);
+    await app.session.startDemo(async () => ({ bitmap: fakeBitmap(), landmarks: bodyPoints() }));
+    assert.equal(app.session.editor.hasCorrections, false);
+    assert.equal(app.session.fit, fit);
+    assert.equal(app.renders.at(-1).tailoring, tailoring);
+    app.session.stop();
+    assert.equal(app.session.fit, fit);
+    assert.equal(app.session.tailoring, tailoring);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('configuration snapshots copy caller data and reject invalid values without redraw or mutation', async () => {
+  const app = setup();
+  try {
+    await trackedCamera(app);
+    const next = { width: 1.1 }, detail = { sleeveOpening: 120 };
+    app.session.setFit(next);
+    app.session.setTailoring(detail);
+    next.width = .9; detail.sleeveOpening = 80;
+    assert.equal(app.session.fit.width, 1.1);
+    assert.equal(app.session.tailoring.sleeveOpening, 120);
+    const fit = app.session.fit, tailoring = app.session.tailoring, count = app.renders.length;
+    for (const patch of [{ width: NaN }, { length: 1.23 }, { vertical: -.19 }, { bogus: 1 }, { constructor: 1 }]) assert.throws(() => app.session.setFit(patch), RangeError);
+    for (const patch of [{ sleeveLength: Infinity }, { shoulderWidth: 116 }, { necklineDepth: 64 }, { bogus: 1 }, { constructor: 1 }]) assert.throws(() => app.session.setTailoring(patch), RangeError);
+    assert.equal(app.session.fit, fit);
+    assert.equal(app.session.tailoring, tailoring);
+    assert.equal(app.renders.length, count);
+    assert.throws(() => { app.session.fit.width = .9; }, TypeError);
+    assert.throws(() => { app.session.tailoring.sleeveOpening = 80; }, TypeError);
+  } finally { app.session.stop(); app.restore(); }
+});
+
+test('tailoring during an in-flight frame keeps source, pose and independent mask dimensions paired', async () => {
+  const app = setup();
+  try {
+    const shown = await trackedCamera(app);
+    await app.video.capture(0, { mediaTime: 2 });
+    const pending = app.worker().lastMessage;
+    app.session.setTailoring({ sleeveLength: 135 });
+    const mask = new Uint8Array(256 * 171).fill(2);
+    app.worker().send({ ...pending, type: 'result', landmarks: bodyPoints(), mask, maskWidth: 256, maskHeight: 171 });
+    const rendered = app.renders.at(-1);
+    assert.equal(rendered.bitmap, pending.bitmap);
+    assert.equal(rendered.mask.data, mask);
+    assert.equal(rendered.mask.width, 256);
+    assert.equal(rendered.mask.height, 171);
+    assert.equal(rendered.tailoring.sleeveLength, 135);
+    assert.equal(shown.bitmap.closed, 1);
+    assert.equal(pending.bitmap.closed, 0);
+  } finally { app.session.stop(); app.restore(); }
+});

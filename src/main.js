@@ -3,6 +3,7 @@ import { createRenderer } from './render.js';
 import { createPreviewSession } from './session.js';
 import { createDemoFrame } from './demo.js';
 import { createTrackingEditor } from './tracking-editor.js';
+import { TAILORING } from './tailoring.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
@@ -10,12 +11,57 @@ const renderer = createRenderer({ base: $('baseCanvas'), garment: $('garmentCanv
 const controls = { width: $('width'), length: $('length'), vertical: $('vertical') };
 let editor;
 
+function showFit() {
+  for (const [key, input] of Object.entries(controls)) {
+    const value = Math.round(session.fit[key] * 100);
+    input.value = value;
+    const text = key === 'vertical' ? `${value > 0 ? '+' : ''}${value}% span` : `${value}%`;
+    $(`${key}Value`).value = text;
+    input.setAttribute('aria-valuetext', key === 'vertical' ? `${value} percent shoulder span` : `${value} percent`);
+  }
+}
+
 function setFit() {
-  const fit = { width: Number(controls.width.value) / 100, length: Number(controls.length.value) / 100, vertical: Number(controls.vertical.value) / 100 };
-  $('widthValue').value = `${Math.round(fit.width * 100)}%`;
-  $('lengthValue').value = `${Math.round(fit.length * 100)}%`;
-  $('verticalValue').value = `${Number(controls.vertical.value) > 0 ? '+' : ''}${controls.vertical.value}`;
-  session.setFit(fit);
+  session.setFit(Object.fromEntries(Object.entries(controls).map(([key, input]) => [key, Number(input.value) / 100])));
+  showFit();
+}
+
+const tailoringInputs = new Map();
+
+function showTailoring() {
+  for (const [key, { input, output }] of tailoringInputs) {
+    const spec = TAILORING[key], value = session.tailoring[key];
+    input.value = value;
+    output.value = `${value}${spec.unit}`;
+    input.setAttribute('aria-valuetext', `${value} ${spec.unit === '°' ? 'degrees' : spec.unit === '% span' ? 'percent shoulder span' : 'percent of style'}`);
+  }
+}
+
+function createTailoringControls() {
+  for (const [key, spec] of Object.entries(TAILORING)) {
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    const output = document.createElement('output');
+    input.id = `tailoring-${key}`;
+    input.type = 'range';
+    input.min = spec.min;
+    input.max = spec.max;
+    input.step = 1;
+    input.setAttribute('aria-describedby', 'tailoringHelp');
+    label.htmlFor = input.id;
+    label.textContent = spec.label;
+    output.setAttribute('aria-hidden', 'true');
+    input.addEventListener('input', () => {
+      session.setTailoring({ [key]: Number(input.value) });
+      showTailoring();
+    });
+    row.append(label, output, input);
+    $('tailoringControls').append(row);
+    tailoringInputs.set(key, { input, output });
+  }
+  showTailoring();
 }
 
 function showStatus({ state, detail, source }) {
@@ -49,6 +95,9 @@ const session = createPreviewSession({
 editor = createTrackingEditor({ session, stage, overlay: $('trackingEditor'), panel: $('calibrationControls'), mirror: () => $('mirrorToggle').checked });
 
 for (const input of Object.values(controls)) input.addEventListener('input', setFit);
+$('resetFit').addEventListener('click', () => { session.resetFit(); showFit(); });
+$('resetTailoring').addEventListener('click', () => { session.resetTailoring(); showTailoring(); });
+createTailoringControls();
 $('garmentToggle').addEventListener('change', (event) => renderer.setEnabled(event.target.checked));
 $('segmentationToggle').addEventListener('change', (event) => session.setOcclusion(event.target.checked));
 $('mirrorToggle').addEventListener('change', (event) => {
@@ -80,7 +129,7 @@ $('cameraSelect').addEventListener('change', (event) => {
 });
 $('demoButton').addEventListener('click', () => session.startDemo(createDemoFrame));
 
-setFit();
+showFit();
 editor.update(session.editor);
 window.addEventListener('pagehide', () => { editor.dispose(); session.stop(); renderer.dispose(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) session.stop(); });

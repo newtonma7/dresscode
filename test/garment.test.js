@@ -4,6 +4,7 @@ import { BufferGeometry, BufferAttribute } from 'three';
 import { fitTorso, buildArmCorridors, pointInArmCorridor } from '../src/geometry.js';
 import { createCage, deformCage, garmentTopology, garmentIndices, buildGarmentFrame, pointInSleeve } from '../src/garment-shape.js';
 import { TAILORING, defaultTailoring, tailoringSnapshot } from '../src/tailoring.js';
+import { createTailoredGarment } from '../src/garment.js';
 
 function torsoFor({ fit = { width: 1, length: 1, vertical: 0 }, roll = 0, raised = false, crossed = false, missing = false } = {}) {
   const points = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 0 }));
@@ -153,6 +154,36 @@ test('actual cuff vertices and sleeve triangles determine tailored foreground un
   const long = buildGarmentFrame(torso, { ...defaultTailoring(), sleeveLength: 135 });
   assert.equal(pointInArmCorridor(230, 454, buildArmCorridors(torso, short.sleeves)), true);
   assert.equal(pointInArmCorridor(230, 454, buildArmCorridors(torso, long.sleeves)), false, 'Long sleeve moves the restoration start');
+});
+
+test('garment updates retain GPU buffers and rest UVs, use deterministic knit, and release every owned resource', () => {
+  const shirt = createTailoredGarment(), other = createTailoredGarment();
+  const mesh = shirt.object.children[0];
+  const positions = mesh.geometry.attributes.position;
+  const uvs = [...mesh.geometry.attributes.uv.array];
+  const index = mesh.geometry.index;
+  const topology = [...index.array];
+  assert.deepEqual(mesh.material.bumpMap.image.data, other.object.children[0].material.bumpMap.image.data);
+  shirt.update(torsoFor(), defaultTailoring());
+  const normals = mesh.geometry.attributes.normal;
+  const first = [...positions.array];
+  const firstSeam = [...shirt.object.children[1].geometry.attributes.position.array];
+  shirt.update(torsoFor({ raised: true, roll: .3 }), { ...defaultTailoring(), shoulderWidth: 115, sleeveLength: 135 });
+  assert.equal(mesh.geometry.attributes.position, positions);
+  assert.equal(mesh.geometry.attributes.normal, normals);
+  assert.equal(mesh.geometry.index, index);
+  assert.deepEqual([...mesh.geometry.index.array], topology);
+  assert.deepEqual([...mesh.geometry.attributes.uv.array], uvs);
+  assert.notDeepEqual([...positions.array], first);
+  assert.notDeepEqual([...shirt.object.children[1].geometry.attributes.position.array], firstSeam);
+  const resources = new Set(shirt.object.children.flatMap((child) => [child.geometry, child.material]));
+  resources.add(mesh.material.bumpMap);
+  const released = new Map();
+  for (const resource of resources) resource.addEventListener('dispose', () => released.set(resource, (released.get(resource) ?? 0) + 1));
+  shirt.dispose();
+  assert.equal(released.size, resources.size);
+  assert.ok([...released.values()].every((n) => n === 1));
+  other.dispose();
 });
 
 test('tailoring boundary rejects unknown, nonfinite and out-of-range values without mutating snapshots', () => {
