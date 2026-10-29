@@ -117,6 +117,38 @@ test('tracking failures keep their actionable reason after cleanup', async () =>
   } finally { app.restore(); }
 });
 
+test('worker errors keep the event message and stop the stream', async () => {
+  const app = setup();
+  try {
+    await app.session.start();
+    const event = new Event('error');
+    Object.defineProperty(event, 'message', { value: 'Tracking worker boot failed. Run npm run assets.' });
+
+    app.worker().onerror(event);
+
+    assert.equal(app.session.state, 'error');
+    assert.equal(app.statuses.at(-1).detail, 'Tracking worker boot failed. Run npm run assets.');
+    assert.equal(app.tracking.at(-1).torso.reason, 'Tracking worker boot failed. Run npm run assets.');
+    assert.equal(app.video.srcObject, null);
+    assert.equal(app.track.stopped, 1);
+    assert.equal(app.worker().terminated, 1);
+  } finally { app.restore(); }
+});
+
+test('worker errors without a message report an actionable fallback', async () => {
+  const app = setup();
+  try {
+    await app.session.start();
+    app.worker().onerror(new Event('error'));
+
+    const reason = 'Tracking worker failed. Run npm run assets and try again.';
+    assert.equal(app.statuses.at(-1).detail, reason);
+    assert.equal(app.tracking.at(-1).torso.reason, reason);
+    assert.equal(app.track.stopped, 1);
+    assert.equal(app.worker().terminated, 1);
+  } finally { app.restore(); }
+});
+
 test('stopping during camera acquisition releases the late stream', async () => {
   const app = setup();
   let resolveCamera;
