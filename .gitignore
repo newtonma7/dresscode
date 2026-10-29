@@ -2,6 +2,7 @@ node_modules/
 dist/
 public/models/
 public/wasm/
+public/vendor/vision_bundle.js
 *.log
 .claude/worktrees/
 todo.md

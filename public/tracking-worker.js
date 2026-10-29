@@ -1,21 +1,23 @@
-import { FilesetResolver, ImageSegmenter, PoseLandmarker } from '@mediapipe/tasks-vision';
+importScripts('/vendor/vision_bundle.js');
 
+const { FilesetResolver, ImageSegmenter, PoseLandmarker } = Vision;
 let pose;
 let segmenter;
 let ready;
+let lastTimestamp = -Infinity;
 
 async function initialize() {
   const files = await FilesetResolver.forVisionTasks('/wasm');
   [pose, segmenter] = await Promise.all([
     PoseLandmarker.createFromOptions(files, {
       baseOptions: { modelAssetPath: '/models/pose.task', delegate: 'CPU' },
-      runningMode: 'IMAGE', numPoses: 1,
+      runningMode: 'VIDEO', numPoses: 1,
       minPoseDetectionConfidence: 0.55, minPosePresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
     }),
     ImageSegmenter.createFromOptions(files, {
       baseOptions: { modelAssetPath: '/models/segmenter.tflite', delegate: 'CPU' },
-      runningMode: 'IMAGE', outputCategoryMask: true, outputConfidenceMasks: false,
+      runningMode: 'VIDEO', outputCategoryMask: true, outputConfidenceMasks: false,
     }),
   ]);
 }
@@ -36,15 +38,18 @@ self.onmessage = async ({ data }) => {
     segmenter?.close();
     pose = segmenter = undefined;
     ready = undefined;
+    lastTimestamp = -Infinity;
     return;
   }
   if (data.type !== 'frame') return;
   const { id, bitmap } = data;
   try {
     await ready;
+    const timestamp = Math.max(Number(data.timestamp) || 0, lastTimestamp + 1);
+    lastTimestamp = timestamp;
     const started = performance.now();
-    const poseResult = pose.detect(bitmap);
-    const segmentation = segmenter.segment(bitmap);
+    const poseResult = pose.detectForVideo(bitmap, timestamp);
+    const segmentation = segmenter.segmentForVideo(bitmap, timestamp);
     const category = segmentation.categoryMask;
     const mask = category ? new Uint8Array(category.getAsUint8Array()) : new Uint8Array();
     const landmarks = poseResult.landmarks?.[0]?.map(({ x, y, z, visibility }) => ({ x, y, z, visibility })) ?? null;

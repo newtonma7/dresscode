@@ -9,6 +9,12 @@ const wasm = new URL('public/wasm/', root);
 await mkdir(wasm, { recursive: true });
 const source = new URL('node_modules/@mediapipe/tasks-vision/wasm/', root);
 for (const name of await readdir(source)) await copyFile(new URL(name, source), new URL(name, wasm));
+const vendor = new URL('public/vendor/', root);
+await mkdir(vendor, { recursive: true });
+await copyFile(
+  new URL('node_modules/@mediapipe/tasks-vision/vision_bundle.js', root),
+  new URL('vision_bundle.js', vendor),
+);
 const models = [
   ['pose.task', 'pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task', '59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a'],
   ['segmenter.tflite', 'image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite', 'c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0'],

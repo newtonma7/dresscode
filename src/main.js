@@ -32,7 +32,10 @@ function showStatus(state, detail = '') {
   $('trackingStatus').classList.toggle('active', active || demoActive);
   $('trackingStatus').classList.toggle('warning', state === 'error');
   if (state === 'running') refreshCameras();
-  if (state === 'error') $('emptyState').hidden = false;
+  if (state === 'error') {
+    $('emptyState').hidden = false;
+    $('sourceLabel').textContent = 'No camera active';
+  }
 }
 
 function showTracking({ torso, inferenceMs, mode }) {
@@ -58,10 +61,12 @@ stage.classList.toggle('mirrored', $('mirrorToggle').checked);
 async function refreshCameras() {
   const select = $('cameraSelect');
   try {
+    const selected = select.value;
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cameras = devices.filter((device) => device.kind === 'videoinput');
     select.replaceChildren(new Option('Default camera', ''));
     cameras.forEach((camera, index) => select.add(new Option(camera.label || `Camera ${index + 1}`, camera.deviceId)));
+    select.value = cameras.some((camera) => camera.deviceId === selected) ? selected : '';
     select.disabled = cameras.length === 0;
   } catch { select.disabled = true; }
 }
@@ -145,6 +150,7 @@ async function renderDemo() {
 }
 
 function startDemo() {
+  clearInterval(demoTimer);
   demoActive = true;
   if (!demoCanvas) buildDemo();
   $('sourceLabel').textContent = 'Synthetic person · not camera footage';
@@ -159,9 +165,10 @@ function startDemo() {
 }
 
 function stopDemo() {
+  clearInterval(demoTimer);
+  demoTimer = undefined;
   if (!demoActive) return;
   demoActive = false;
-  clearInterval(demoTimer);
   $('demoBadge').hidden = true;
   if (session?.state === 'stopped') renderer.clear();
 }

@@ -12,7 +12,7 @@ npm run dev
 
 Open the loopback URL printed by Vite. Click **Try the camera-free demo** to check the rendering path without permission prompts or inference. Click **Start camera** to request a camera. The physical camera selector appears after permission is granted. **Stop** releases the camera and clears the preview. Hiding the tab or leaving the page also stops capture.
 
-`npm run assets` copies the MediaPipe Tasks Vision 1.2.0 WASM runtime locally and downloads the pose-landmarker-lite and selfie-multiclass models. Runtime model and WASM requests use these local files. The camera tracker runs both models in a worker with the CPU delegate. It sends one frame at a time and returns the same image with its pose and category mask. There is no CDN runtime dependency, analytics, or webcam transport.
+`npm run assets` copies the MediaPipe Tasks Vision 1.2.0 WASM runtime and classic worker bundle locally, then downloads the pose-landmarker-lite and selfie-multiclass models. Runtime requests use these local files. The classic worker runs both models with the CPU delegate. It handles one frame at a time and returns that image with its pose and category mask. There is no CDN runtime dependency, analytics, or webcam transport.
 
 ## What the preview does
 

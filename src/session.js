@@ -29,13 +29,17 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
 
   function release(owner = resources) {
     if (!owner) return;
+    const wasCurrent = resources === owner;
     owner.closed = true;
     if (owner.frameId && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(owner.frameId);
+    owner.videoTrack?.removeEventListener('ended', owner.onTrackEnded);
     if (owner.stream) for (const track of owner.stream.getTracks()) track.stop();
     if (video.srcObject === owner.stream) video.srcObject = null;
     owner.worker?.terminate();
-    renderer.clear();
-    if (resources === owner) resources = undefined;
+    if (wasCurrent) {
+      renderer.clear();
+      resources = undefined;
+    }
   }
 
   async function start(deviceId) {
@@ -50,11 +54,19 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
         video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
       });
       if (id !== generation) { stream.getTracks().forEach((track) => track.stop()); return; }
-      const owner = { stream, worker: new Worker(new URL('./tracking-worker.js', import.meta.url), { type: 'module' }), inFlight: false };
+      const owner = {
+        stream,
+        videoTrack: stream.getVideoTracks?.()[0] ?? stream.getTracks().find((track) => track.kind === 'video'),
+        worker: new Worker('/tracking-worker.js'),
+        inFlight: false,
+      };
+      owner.onTrackEnded = () => fail(owner, new Error('Camera disconnected. Reconnect the camera and start again.'));
       resources = owner;
+      owner.videoTrack?.addEventListener('ended', owner.onTrackEnded);
+      if (owner.videoTrack?.readyState === 'ended') { owner.onTrackEnded(); return; }
       video.srcObject = stream;
       await video.play();
-      if (id !== generation) { release(owner); return; }
+      if (id !== generation || owner.closed || resources !== owner) { release(owner); return; }
       owner.worker.onmessage = ({ data }) => {
         if (owner.closed || resources !== owner) { data.bitmap?.close(); return; }
         if (data.type === 'ready') {
@@ -94,14 +106,15 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
 
   async function schedule(owner) {
     if (owner.closed || owner.inFlight || !owner.ready || state !== 'running') return;
-    const capture = async () => {
+    const capture = async (_now, metadata) => {
       owner.frameId = 0;
       if (owner.closed || owner.inFlight) return;
       owner.inFlight = true;
       try {
         const bitmap = await createImageBitmap(video);
         if (owner.closed) { bitmap.close(); return; }
-        owner.worker.postMessage({ type: 'frame', id: performance.now(), bitmap }, [bitmap]);
+        const timestamp = Number.isFinite(metadata?.mediaTime) ? metadata.mediaTime * 1000 : performance.now();
+        owner.worker.postMessage({ type: 'frame', id: timestamp, timestamp, bitmap }, [bitmap]);
       } catch (error) {
         owner.inFlight = false;
         fail(owner, error);
@@ -112,10 +125,11 @@ export function createSession({ video, renderer, onStatus, onTracking }) {
   }
 
   function fail(owner, error) {
-    if (owner.closed) return;
+    if (owner.closed || resources !== owner) return;
+    const reason = error instanceof Error ? error.message : String(error);
     release(owner);
-    status('error', error instanceof Error ? error.message : String(error));
-    onTracking({ torso: { kind: 'unavailable', reason: 'Tracking unavailable' }, inferenceMs: null, mode: 'camera' });
+    status('error', reason);
+    onTracking({ torso: { kind: 'unavailable', reason }, inferenceMs: null, mode: 'camera' });
   }
 
   function stop() {
