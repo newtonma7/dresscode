@@ -31,4 +31,8 @@ Reject footage with exposed torso holes, disconnected sleeves, arm-shaped cutout
 
 ## Status
 
-Implementation and browser verification are pending.
+The first implementation at bee8b8f passed four Node tests and the production build. The build reported a 543 KB main-bundle advisory. Browser verification rejected that implementation.
+
+Observed failures are tracked in [issue 1](https://github.com/newtonma7/dresscode/issues/1). The overlay toggle threw `Cannot read properties of undefined (reading 'bitmap')`. Starting a fake camera reached a Vite error loading the WASM script from a module worker. The demo screenshot showed disconnected shoulder geometry and a narrow torso panel. Independent lifecycle review also reproduced a stale frame after the current camera track ended.
+
+Local evidence is in `.audit/demo-full-before.png`, `.audit/initial.png`, and `.audit/vite.log`. These files are ignored by Git. No physical camera was opened. Repairs and repeat browser checks are pending.

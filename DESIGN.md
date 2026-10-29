@@ -30,6 +30,8 @@ We accept browser dependency and image copies for a local preview without Python
 
 JavaScript modules avoid a TypeScript build layer for this small preview. There is one fixed garment, not a general garment API. No privileged system changes or virtual camera installation in this milestone.
 
+The first E2E run at bee8b8f rejected the initial implementation. MediaPipe's loader falls back to dynamic import in a module worker, which Vite rejects for public WASM loader scripts. The supported replacement is a same-origin classic worker with MediaPipe's pinned IIFE bundle loaded by importScripts. Assets remain local and the single-frame ownership contract does not change. The garment owner is replacing the discontinuous grid mapping and mismatched collar with connected garment geometry. These changes are driven by actual runtime failures, tracked in GitHub issue 1.
+
 ## Open risks
 
 Actual webcam quality, sustained performance, body-fit reliability, and hand-over-torso occlusion need real footage. Automated demo and blank-camera checks cannot settle these questions. No real webcam footage is stored without a deliberate user action.
