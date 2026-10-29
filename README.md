@@ -4,6 +4,8 @@ A local feasibility preview for a navy crew-neck overlay. It is a fit sketch, no
 
 ## Quick start
 
+Use Node.js 24 and a desktop browser with WebGL. This run used Chrome on Ubuntu. The app requests video only, never microphone access.
+
 ```sh
 npm install
 npm run assets
@@ -18,7 +20,7 @@ Open the loopback URL printed by Vite. Click **Try the camera-free demo** to che
 
 The Three.js 0.186.1 garment is a fixed, shallow deformable mesh with a crew opening, collar, navy fabric texture and subtle surface folds. It fits the shoulder and hip landmarks. If hips are cropped, garment length falls back to shoulder span. Width, length and vertical position are adjustable. Mirror, overlay, and foreground segmentation can be toggled.
 
-Tracking requires visible, approximately front-facing shoulders. A missing person or unsupported turned pose hides the entire image and garment with a reason. It does not silently show raw camera footage. The category labels used by the selfie multiclass model are 0 background, 1 hair, 2 body-skin, 3 face-skin, 4 clothes and 5 others, as documented in the [official MediaPipe Image Segmenter model guide](https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter#models). Hair and face are preserved near the pose head point. Body-skin pixels are restored only inside pose-guided arm corridors beyond the virtual sleeve edge, so bare torso skin is not restored over the shirt or its sleeves.
+The fitting model assumes a frontal torso with visible shoulders. Missing or collapsed shoulder landmarks hide the entire image and garment with a reason. It does not reliably detect side turns, so a sideways pose can still produce a visibly wrong fit. It does not silently show raw camera footage. The category labels used by the selfie multiclass model are 0 background, 1 hair, 2 body-skin, 3 face-skin, 4 clothes and 5 others, as documented in the [official MediaPipe Image Segmenter model guide](https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter#models). Hair and face are preserved near the pose head point. Body-skin pixels are restored only inside pose-guided arm corridors beyond the virtual sleeve edge, so bare torso skin is not restored over the shirt or its sleeves.
 
 ## Limits
 
@@ -33,11 +35,13 @@ npm test
 npm run build
 ```
 
+With the dev server running, open `/test/renderer.html`. Expect `PASS 26 renderer checks`. These browser checks cover actual WebGL output, toggles, bare-torso mask compositing, and bitmap cleanup. They use synthetic pixels, not real camera footage. See [verification results](VERIFICATION.md) for the unattended run and remaining quality gates.
+
 Manual quality checks:
 
 1. Open the app and verify the neutral preview does not request a camera.
 2. Use the camera-free demo. Confirm the badge says simulated and no inference time is reported. Toggle the garment, segmentation and mirror controls, then adjust width, length and vertical fit.
 3. Start a camera manually. Verify permission is requested only on click, a physical camera list appears after permission, and a front-facing torso produces the overlay and measured inference time.
-4. Move out of frame or turn away. Confirm the shirt and image clear and a tracking reason appears rather than stale garment or raw video.
+4. Move out of frame. Confirm the shirt and image clear and a tracking reason appears rather than stale garment or raw video. Check side turns separately. They are unsupported and are not reliably rejected.
 5. Stop, restart, and change cameras. Confirm the camera is released on Stop and when the tab becomes hidden.
 6. Test on the target Ubuntu 26.04 Wayland / Ryzen 7730U system. The synthetic demo and automated tests do not establish real-camera fit, sustained inference speed, or meeting quality.

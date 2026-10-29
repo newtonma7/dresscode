@@ -2,7 +2,7 @@
 
 ## Runtime dependencies
 
-`package-lock.json` pins the dependency versions. MediaPipe Tasks Vision is Apache-2.0. Three.js and Vite are MIT. Their package distributions contain their license notices.
+`package-lock.json` pins the dependency versions. MediaPipe Tasks Vision declares Apache-2.0 in its package metadata. Three.js and Vite are MIT and include license files in their packages. MediaPipe's source repository provides the [Apache-2.0 license](https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE).
 
 ## Models
 

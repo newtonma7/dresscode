@@ -16,7 +16,7 @@ The session is a state machine with stopped, starting, running, and error states
 
 Keep a small interface. `startPreview({video, canvas, deviceId, onStatus})` returns a stop function and fit update controls. Internal frame data consists of the source bitmap, timestamp, pose landmarks, category mask dimensions and bytes. Renderer owns garment fitting, GPU resources, and foreground compositing. No garment/plugin system.
 
-The garment is an authored shallow mesh with a crew-neck opening, sleeves, navy fabric texture, collar and seams. Pose is not a cloth simulation. Category segmentation plus arm landmarks estimates exposed-arm foreground; all torso skin must not be restored because bare torso is supported. Hair and face can appear in front. Person segmentation alone cannot distinguish arms from torso.
+The garment is an authored shallow mesh with a crew-neck opening, sleeves, navy fabric texture, collar and seams. Shared pixel-space panel anchors keep body and sleeves connected. Anatomical arm pairs sort by image position before fitting. The old shoulder-slope yaw check was removed because it measured roll instead of turn angle. Side turns remain unsupported and are not reliably rejected. Pose is not a cloth simulation. Category segmentation plus arm landmarks estimates exposed-arm foreground; all torso skin must not be restored because bare torso is supported. Hair and face can appear in front. Person segmentation alone cannot distinguish arms from torso.
 
 ## Synthesis decision
 
